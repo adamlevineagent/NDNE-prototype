@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient, { agents } from '../api/apiClient';
+import AgentChatPanel from '../components/AgentChatPanel';
 
 // Placeholder types - replace with actual types from Prisma schema if shared
 interface AgentData {
@@ -31,6 +32,9 @@ const DashboardPage: React.FC = () => {
     const [isVetoingAction, setIsVetoingAction] = useState(false);
     const [vetoingActionId, setVetoingActionId] = useState<string | null>(null);
     const [vetoFeedbackMessage, setVetoFeedbackMessage] = useState<{message: string, isError: boolean} | null>(null);
+    
+    // Chat panel state
+    const [isChatMinimized, setIsChatMinimized] = useState(true);
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -265,6 +269,16 @@ const DashboardPage: React.FC = () => {
                     </ul>
                 )}
             </div>
+            
+            {/* Agent Chat Panel */}
+            {agentData && (
+                <AgentChatPanel
+                    agentId={agentData.id}
+                    minimized={isChatMinimized}
+                    onMinimize={() => setIsChatMinimized(true)}
+                    onMaximize={() => setIsChatMinimized(false)}
+                />
+            )}
         </div>
     );
 };

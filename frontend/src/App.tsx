@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import OnboardingWizard from './components/OnboardingWizard';
+import OnboardingChat from './components/OnboardingChat';
 import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -48,7 +48,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} />
           <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" /> : <LoginPage />} />
           <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" /> : <RegisterPage />} />
-          <Route path="/onboarding" element={isAuthenticated ? <OnboardingWizard /> : <Navigate to="/login" />} />
+          <Route path="/onboarding" element={isAuthenticated ? <OnboardingChat /> : <Navigate to="/login" />} />
           {/* Protected Routes */}
           <Route path="/dashboard" element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />} />
           <Route path="/proposals" element={isAuthenticated ? <ProposalList /> : <Navigate to="/login" />} />

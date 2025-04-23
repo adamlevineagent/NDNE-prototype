@@ -12,6 +12,7 @@ import pauseAgentRouter from './routes/agents/pauseAgentHandler';
 import feedbackRouter from './routes/agents/feedbackHandler'; // Import the feedback router
 import onboardingRouter from './routes/onboarding'; // Import the onboarding router
 import adminRouter from './routes/admin'; // Import the admin router
+import chatRouter from './routes/chat'; // Import the chat router
 
 dotenv.config();
 
@@ -48,6 +49,7 @@ app.use('/api/agents', pauseAgentRouter);
 app.use('/api/agents', feedbackRouter); // Mount the feedback router
 app.use('/api/onboarding', onboardingRouter); // Mount the onboarding router
 app.use('/api/admin', adminRouter); // Mount the admin router
+app.use('/api/chat', chatRouter); // Mount the chat router
 
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });

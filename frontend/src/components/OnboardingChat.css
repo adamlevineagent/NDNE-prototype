@@ -1,0 +1,137 @@
+.onboarding-chat-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.onboarding-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.onboarding-header h2 {
+  font-size: 1.8rem;
+  margin-bottom: 0.5rem;
+  color: #2d3748;
+}
+
+.onboarding-header p {
+  color: #4a5568;
+  font-size: 1.1rem;
+}
+
+.onboarding-progress {
+  margin-bottom: 2rem;
+}
+
+.progress-bar {
+  height: 8px;
+  background-color: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #4299e1;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.stage-label {
+  text-align: right;
+  font-size: 0.9rem;
+  color: #718096;
+}
+
+.chat-wrapper {
+  flex: 1;
+  margin-bottom: 2rem;
+  min-height: 400px;
+}
+
+.onboarding-footer {
+  font-size: 0.9rem;
+  color: #718096;
+  text-align: center;
+  padding: 1rem;
+  background-color: #f7fafc;
+  border-radius: 8px;
+}
+
+/* Loading state */
+.onboarding-chat-container.loading {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(66, 153, 225, 0.2);
+  border-top-color: #4299e1;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error state */
+.onboarding-chat-container.error {
+  justify-content: center;
+  align-items: center;
+}
+
+.error-message {
+  text-align: center;
+  padding: 2rem;
+  background-color: #fff5f5;
+  border-radius: 8px;
+  border-left: 4px solid #f56565;
+  max-width: 500px;
+}
+
+.error-message h3 {
+  color: #c53030;
+  margin-bottom: 1rem;
+}
+
+.error-message button {
+  background-color: #f56565;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+.error-message button:hover {
+  background-color: #c53030;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .onboarding-chat-container {
+    padding: 1rem;
+  }
+  
+  .onboarding-header h2 {
+    font-size: 1.5rem;
+  }
+  
+  .chat-wrapper {
+    min-height: 300px;
+  }
+}

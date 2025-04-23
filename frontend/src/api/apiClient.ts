@@ -117,4 +117,18 @@ export const onboarding = {
     apiClient.post(`/onboarding/steps/${step}`, data),
 };
 
+export const chat = {
+  sendMessage: (data: { agentId: string; content: string; metadata?: any }) =>
+    apiClient.post('/chat/messages', data),
+  
+  getMessages: (agentId: string, params?: { limit?: number; before?: string; onboarding?: boolean }) =>
+    apiClient.get('/chat/messages', { params: { agentId, ...params } }),
+  
+  getMessage: (id: string) =>
+    apiClient.get(`/chat/messages/${id}`),
+  
+  deleteMessage: (id: string) =>
+    apiClient.delete(`/chat/messages/${id}`),
+};
+
 export default apiClient;

@@ -1,0 +1,84 @@
+.chat-input-form {
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.chat-input-container {
+  display: flex;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #fff;
+  position: relative;
+}
+
+.chat-input {
+  flex: 1;
+  padding: 12px 15px;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.4;
+  max-height: 150px;
+  min-height: 40px;
+}
+
+.chat-input:disabled {
+  background-color: #f9f9f9;
+  color: #999;
+}
+
+.send-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.send-button:hover {
+  background-color: #0069d9;
+}
+
+.send-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.chat-input-disabled-message {
+  color: #666;
+  font-size: 0.8rem;
+  text-align: center;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+/* Auto-resize textarea */
+.chat-input {
+  overflow-y: auto;
+}
+
+/* Style scrollbar for webkit browsers */
+.chat-input::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-input::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.chat-input::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.chat-input::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
