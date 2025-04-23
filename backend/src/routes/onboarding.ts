@@ -31,11 +31,32 @@ router.post('/steps/:step', requireAuth, async (req: AuthenticatedRequest, res: 
     // Cast the body to the expected structure
     const data = req.body as OnboardingStepBody;
     const userId = req.user?.userId;
-    const agentId = req.user?.agentId;
 
-    if (!userId || !agentId) {
-        return res.status(401).json({ error: 'Authentication invalid or missing user/agent ID.' });
+    if (!userId) {
+        return res.status(401).json({ error: 'Authentication invalid or missing user ID.' });
     }
+
+    // Ensure agent exists for this user, or create one if not
+    let agent = await prisma.agent.findFirst({ where: { userId } });
+    if (!agent) {
+        try {
+            agent = await prisma.agent.create({
+                data: {
+                    userId,
+                    name: data.agentName || "Agent",
+                    color: data.agentColor || "#007bff",
+                    preferences: data.preferences || {},
+                    publicKey: "placeholder-key",
+                    encryptedPrivKey: "placeholder-priv",
+                }
+            });
+            console.log(`Created new agent for user ${userId}: ${agent.id}`);
+        } catch (err) {
+            console.error("Error creating agent during onboarding:", err);
+            return res.status(500).json({ error: "Failed to create agent during onboarding." });
+        }
+    }
+    const agentId = agent.id;
 
     try {
         // Initialize with specific Prisma types
@@ -88,6 +109,92 @@ router.post('/steps/:step', requireAuth, async (req: AuthenticatedRequest, res: 
         }
         res.status(500).json({ error: 'Internal server error processing onboarding step.' });
     }
+});
+
+/**
+ * POST /api/onboarding/message
+ * Handles FSM-based onboarding chat messages.
+ */
+router.post('/message', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { message, step, selectedIssues, issueQueue, currentIssueIndex } = req.body;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication invalid or missing user ID.' });
+    }
+
+    // Get agent for this user
+    const agent = await prisma.agent.findFirst({
+      where: { userId }
+    });
+
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found for user' });
+    }
+
+    // Call FSM onboarding logic
+    const result = await (await import('../services/agent-service')).conductOnboardingChat(
+      userId,
+      agent.id,
+      message,
+      {
+        step,
+        selectedIssues,
+        issueQueue,
+        currentIssueIndex
+      }
+    );
+
+    return res.json(result);
+  } catch (error) {
+    console.error('Error in onboarding message route:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/onboarding/reset
+ * Resets onboarding state for the current user's agent.
+ */
+router.post('/reset', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    const { agentId } = req.body;
+
+    if (!userId || !agentId) {
+      return res.status(400).json({ error: 'Missing user or agent ID.' });
+    }
+
+    // Reset agent to pre-onboarding state
+    await prisma.agent.update({
+      where: { id: agentId },
+      data: {
+        name: 'Agent',
+        color: '#4299E1',
+        preferences: {},
+        onboardingCompleted: false
+      } as any
+    });
+
+    // Delete onboarding chat messages for this agent/user
+    // Use the standard Prisma model property (singular, camelCase)
+    await prisma.chatMessage.deleteMany({
+      where: {
+        agentId,
+        userId,
+        metadata: {
+          path: ['isOnboarding'],
+          equals: true
+        }
+      }
+    });
+
+    res.json({ message: 'Onboarding reset successfully.' });
+  } catch (error) {
+    console.error('Error resetting onboarding:', error);
+    res.status(500).json({ error: 'Failed to reset onboarding.' });
+  }
 });
 
 export default router;

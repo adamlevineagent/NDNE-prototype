@@ -1,300 +1,41 @@
-# NDNE Prototype Testing Log
+# Testing Log - Onboarding Process
 
-## Testing Overview
+## Date: 4/23/2025
+## Tester: Roo
 
-This document captures the testing process, findings, and fixes implemented during the troubleshooting phase of the NDNE prototype, with a focus on the authentication flow and API endpoints.
+## Issues Found
 
-## Test Matrix Results
+### 1. Chat Interface Response Issues
+- **Description**: When providing responses in the onboarding chat interface, the agent sometimes doesn't properly process or respond to user input.
+- **Steps to Reproduce**:
+  1. Start onboarding process
+  2. Answer first question about decision-making preferences
+  3. Attempt to answer the follow-up question about preferences prioritization
+  4. Agent doesn't acknowledge or process the second response 
+- **Expected Behavior**: Agent should acknowledge each response and continue with appropriate follow-up questions.
+- **Actual Behavior**: Agent gets stuck waiting for a response even after providing one.
 
-| Component | Test Case | Initial Status | Resolution | Notes |
-|-----------|-----------|----------------|------------|-------|
-| Backend API | `/api/health` endpoint | ❌ Failing (404) | ✅ Fixed | Added explicit `/api/health` endpoint to match frontend expectations |
-| Authentication | User login | ❌ Failing (401) | ✅ Fixed | User login route returns 401 with invalid credentials |
-| Authentication | User registration | ❌ Failing (409) | ⚠️ Partial | Email already in use error handled, but UX could be improved |
-| API Endpoints | `/api/auth/me` endpoint | ❌ Missing | ✅ Fixed | Added `/api/auth/me` endpoint to match frontend client expectations |
-| Frontend Client | API path consistency | ❌ Failing | ✅ Fixed | Updated `apiClient.ts` to use correct endpoint paths |
-| Database | PostgreSQL connection | ❌ Failing | ✅ Fixed | Docker containers need to be running for database connectivity |
-| Frontend | Veto/Undo functionality | ❌ Failing (timeout) | ✅ Fixed | Implemented proper timeout handling and better UI feedback |
+### 2. Onboarding Flow Logic Issues
+- **Description**: The onboarding process is not properly progressing through defined stages.
+- **Steps to Reproduce**: Complete several exchanges in the onboarding chat.
+- **Expected Behavior**: Agent should progress through initial, preferences, priorities, and confirmation stages.
+- **Actual Behavior**: Stage progression logic is simplistic and not properly integrated with the chat interface.
 
-## Issues & Fixes
+### 3. Onboarding Prompts Need Improvement
+- **Description**: The system prompt for onboarding contains placeholder text.
+- **Steps to Reproduce**: Review backend/src/services/prompt-templates/onboarding-prompts.ts file.
+- **Expected Behavior**: Clear, specific prompts for the agent to follow during onboarding.
+- **Actual Behavior**: Contains placeholder text "[list of required preferences]" which may cause confusion.
 
-### 1. Missing `/api/health` Endpoint
+### 4. Chat Route Not Using Onboarding-Specific Logic
+- **Description**: The chat route is using a generic LLM call rather than the specialized onboarding chat function.
+- **Steps to Reproduce**: Review the POST /api/chat/messages route handler.
+- **Expected Behavior**: Should use conductOnboardingChat for onboarding messages.
+- **Actual Behavior**: Uses generic LLM call that doesn't handle onboarding stages.
 
-**Issue**: Backend server responded with 404 when hitting `/api/health`, which is expected by the frontend for health checks.
+## Fixes Required
 
-**Fix**: Added a proper `/api/health` endpoint in `backend/src/index.ts`:
-
-```typescript
-app.get('/api/health', (_req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
-```
-
-**Test Result**: Health endpoint now responds with 200 status and expected JSON payload.
-
-### 2. Frontend API Client Path Mismatch
-
-**Issue**: Frontend was attempting to fetch user data from `/users/me` but backend expected `/auth/me`.
-
-**Fix**: Updated API client in `frontend/src/api/apiClient.ts`:
-
-```typescript
-getUser: () => 
-  apiClient.get('/auth/me'),
-```
-
-**Test Result**: API client paths now match backend expectations.
-
-### 3. Missing User Data Endpoint
-
-**Issue**: Backend was missing a `/api/auth/me` endpoint to return the current user's data.
-
-**Fix**: Added new endpoint in `backend/src/routes/auth.ts`:
-
-```typescript
-// Add endpoint to get current user info
-router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
-  try {
-    const userId = req.user?.userId;
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'Authentication invalid' });
-    }
-    
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        digestFrequency: true,
-        digestTone: true,
-        createdAt: true,
-        updatedAt: true,
-        role: true
-      }
-    });
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    // Get agent info as well
-    const agent = await prisma.agent.findFirst({
-      where: { userId: userId },
-      select: {
-        id: true,
-        name: true,
-        color: true,
-        preferences: true
-      }
-    });
-    
-    res.json({ data: { ...user, agent } });
-  } catch (error) {
-    console.error('Error fetching user:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-```
-
-**Test Result**: Endpoint now returns user data when authenticated.
-
-## User Registration & Login Flow Testing
-
-### Registration Testing
-- Email validation works correctly
-- Password validation works correctly
-- Duplicate email address returns 409 Conflict with appropriate error message
-- Successful registration redirects appropriately
-
-### Login Testing
-- Invalid credentials return 401 Unauthorized with error message
-- Valid credentials generate JWT token
-- JWT token is stored correctly in localStorage
-- Redirect to dashboard/onboarding occurs based on user state
-
-## Browser-Based Testing
-I used browser-based testing to validate frontend-backend interactions:
-
-1. Created test account with email `test@example.com` and password `TestPassword123`
-2. Verified login flow with the created account
-3. Verified error handling when attempting to re-register with the same email
-4. Verified error handling with invalid login credentials
-
-## Known Issues & Recommendations
-
-1. **Toast/Notification System**: Frontend should implement a toast notification system for more user-friendly error messages.
-
-2. **Form Validation**: Add client-side validation to prevent unnecessary API calls.
-
-3. **Password Strength Requirements**: Consider adding password strength requirements (minimum length, special chars, etc.).
-
-4. **JWT Token Refresh**: Implement token refresh logic to handle expired tokens gracefully.
-
-5. **Auth Context Improvements**: The AuthContext could be enhanced to provide loading states and better error handling.
-
-6. **Autocomplete Attributes**: Add proper autocomplete attributes on password fields (current-password, new-password).
-
-7. **Remember Me Feature**: Consider adding a "Remember Me" option for longer token expiration.
-
-## Next Steps
-
-1. Complete the onboarding flow testing after login
-2. Test agent preferences update flow
-3. Implement and test proposal creation and voting
-4. Test alignment score calculation based on user feedback
-5. Test digest worker scheduling and content generation
-
----
-
-*This test log was created on 4/22/2025 as part of the NDNE prototype testing process.*
-## Onboarding & Dashboard Testing - 4/22/2025 Update
-
-### Registration & Onboarding Flow Testing
-1. Successfully registered a new account with email `newtest422@example.com` and password `TestPassword456`
-2. Verified redirection to the onboarding wizard after registration
-3. Completed all three steps of the onboarding wizard:
-   - Step 1: Set agent name ("TestAgent") and color (#4287f5)
-   - Step 2: Set agent preferences (Priority: Security, Risk Tolerance: Low, Communication Style: Direct)
-   - Step 3: Configured digest settings (Frequency: 24 hours, Tone: Neutral)
-4. Successfully redirected to dashboard after completing onboarding
-
-### Dashboard Features Testing
-1. Verified agent information display:
-   - Agent name displayed correctly as "TestAgent"
-   - Agent color displayed correctly
-   - Alignment score shown (85.0%)
-2. Verified agent status management:
-   - Initial status showed "Agent is active"
-   - Tested "Pause Agent (24h)" functionality
-   - Status correctly updated to show "Agent is paused until: 4/23/2025, 3:27:35 PM"
-3. Verified Recent Actions section:
-   - Displayed previous agent votes and comments
-   - Showed override information where applicable
-   - Displayed timestamps and confidence levels
-
-### Navigation Testing
-1. Verified all main navigation tabs:
-   - Dashboard: Displays agent status and recent actions
-   - Proposals: Currently shows placeholder content
-   - Settings: Currently shows placeholder content
-
-### Issues & Observations
-1. Attempted to test Veto/Undo functionality in the Recent Actions section but encountered a timeout error
-2. Proposals and Settings pages contain placeholder content and need implementation
-3. The agent color selector in onboarding process lacks a visual color picker UI (requires hex input)
-
-## System Configuration & Database Testing - 4/23/2025 Update
-
-### Database Connection Issues
-1. Identified major issue: PostgreSQL database connection failures causing login errors
-   - Error symptom: 500 Internal Server Error during login attempts
-   - Root cause: Docker not running, preventing connection to PostgreSQL database
-   - Fix: Ensured Docker daemon was running and started containers with `docker-compose up -d postgres redis`
-   - Verified fix: Login now returns proper response (401 Invalid credentials with correct error message)
-
-### Veto/Undo Functionality Improvements
-1. Identified issues with the veto/undo implementation in DashboardPage.tsx:
-   - Error symptom: Timeout errors when attempting to veto/undo agent actions
-   - Problems:
-     - No timeout handling in API calls
-     - Entire page reloading after veto action
-     - Poor error feedback to users
-     - No loading state indicators
-   
-2. Implemented fixes:
-   - Added 15-second timeout handling for veto API calls
-   - Replaced page reload with React state updates
-   - Added clear error/success messaging UI
-   - Implemented loading indicators during API calls
-   - Fixed API client import issues (proper import of `agents` from apiClient)
-   - Added background data refresh after successful veto
-
-3. Testing results:
-   - Veto buttons now show loading state during API calls
-   - Users receive clear feedback messages after veto operations
-   - Timeout handling prevents UI from hanging indefinitely
-   - State updates properly reflect veto status without page reload
-
-### Environment Setup Testing
-1. Created comprehensive documentation for environment setup requirements:
-   - Docker daemon must be running
-   - PostgreSQL and Redis containers must be started
-   - Added these details to HANDOFF.md for future developers
-
-### Next Testing Steps
-1. Complete end-to-end testing of the veto/undo functionality with real data
-2. Test proposal creation and voting flows
-3. Complete implementation and testing of the Settings page
-4. Implement and test the Proposals page functionality
-
----
-
-*This test log was updated on 4/23/2025 as part of the ongoing NDNE prototype testing process.*
-
-## Chat System & Conversational Onboarding Implementation - 4/23/2025 Update
-
-### Chat System Implementation
-1. Successfully implemented core chat system components:
-   - Created new API endpoints for chat functionality:
-     - `POST /api/chat/messages` for creating new messages
-     - `GET /api/chat/messages` for retrieving message history with pagination
-     - `GET /api/chat/messages/:id` for getting specific messages
-     - `DELETE /api/chat/messages/:id` for deleting messages
-   - Built complete UI component set for chat functionality:
-     - ChatInterface - Main container component
-     - ChatMessage - Individual message styling and rendering
-     - ChatInput - Text input with send button
-     - ChatHistory - Scrollable message history with pagination
-
-2. Database Schema Extensions:
-   - Added new models to schema.prisma for chat functionality:
-     - ChatMessage model for user-agent communications
-     - NegotiationSession model for agent-to-agent negotiations
-     - NegotiationMessage model for structured negotiation communications
-   - Extended Agent model with additional fields:
-     - onboardingCompleted
-     - lastInteraction
-     - userKnowledge
-   - Extended Proposal model with negotiation-related fields:
-     - negotiationId
-     - isNegotiated
-     - negotiationSummary
-
-### Conversational Onboarding Implementation
-1. Successfully replaced form-based onboarding with chat-based interface:
-   - Created OnboardingChat component to replace OnboardingWizard
-   - Implemented progress tracking for onboarding stages
-   - Updated App.tsx routing to use new onboarding component
-   - Integrated with chat system for conversational preference gathering
-
-2. Dashboard Integration:
-   - Implemented AgentChatPanel component for dashboard
-   - Added minimize/maximize functionality
-   - Integrated chat panel with agent status display
-   - Updated DashboardPage to display chat interface
-
-### Testing Status
-1. Component Tests:
-   - ✅ Verified API endpoint responses for chat messages
-   - ✅ Confirmed chat UI components render correctly
-   - ✅ Tested message sending and receiving functionality
-   - ✅ Validated pagination for chat history
-   - ❌ LLM response generation (pending integration)
-
-2. Pending Implementation:
-   - Backend LLM service integration for generating agent responses
-   - Agent memory/context management
-   - Negotiation system for agent-to-agent interaction
-   - Connection between negotiations and proposals
-
-### Next Testing Steps
-1. Test database migration once configuration issues are resolved
-2. Verify LLM integration with chat system
-3. Test complete conversational onboarding flow with LLM responses
-4. Test agent-to-agent negotiation flow
-5. Validate proposal creation from negotiations
-
----
-
-*This test log was updated on 4/23/2025 to document chat system implementation progress.*
+1. Update the chat route to use conductOnboardingChat for messages with isOnboarding metadata
+2. Enhance onboarding prompts to remove placeholders and provide clear guidance
+3. Fix the ChatInterface component to properly handle message processing and errors
+4. Improve the progression logic in the conductOnboardingChat function

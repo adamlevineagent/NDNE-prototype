@@ -2,7 +2,8 @@
 # Start NDNE prototype backend and frontend servers with improved handling
 
 # Store the original directory
-ORIGINAL_DIR=$(pwd)
+# Get the directory of this script
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Check if servers are already running
 echo "Checking for running servers..."
@@ -12,11 +13,11 @@ FRONTEND_RUNNING=$(lsof -t -i:5175 2>/dev/null || lsof -t -i:5174 2>/dev/null ||
 # Start backend server if not already running
 if [ -z "$BACKEND_RUNNING" ]; then
   echo "Starting backend server..."
-  cd "$ORIGINAL_DIR/backend" || { echo "Error: backend directory not found"; exit 1; }
+  cd "$SCRIPT_DIR/../backend" || { echo "Error: backend directory not found"; exit 1; }
   npm run dev &
   BACKEND_PID=$!
   echo "Backend server started with PID: $BACKEND_PID"
-  cd "$ORIGINAL_DIR" || exit
+  cd "$SCRIPT_DIR/.." || exit
 else
   echo "Backend server already running with PID: $BACKEND_RUNNING"
 fi
@@ -27,11 +28,11 @@ sleep 2
 # Start frontend server if not already running
 if [ -z "$FRONTEND_RUNNING" ]; then
   echo "Starting frontend server..."
-  cd "$ORIGINAL_DIR/frontend" || { echo "Error: frontend directory not found"; exit 1; }
+  cd "$SCRIPT_DIR/../frontend" || { echo "Error: frontend directory not found"; exit 1; }
   npm run dev &
   FRONTEND_PID=$!
   echo "Frontend server started with PID: $FRONTEND_PID"
-  cd "$ORIGINAL_DIR" || exit
+  cd "$SCRIPT_DIR/.." || exit
 else
   echo "Frontend server already running with PID: $FRONTEND_RUNNING"
 fi

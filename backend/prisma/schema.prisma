@@ -13,7 +13,7 @@ model User {
   passwordHash     String
   publicKey        String
   encryptedPrivKey String
-  role             String   @default("USER") // Role as string for SQLite
+  role             String   @default("USER")
   digestFrequency  Int      @default(24)
   digestTone       String   @default("neutral")
   createdAt        DateTime @default(now())
@@ -23,9 +23,6 @@ model User {
   digests          Digest[]
   chatMessages     ChatMessage[]
 }
-
-// Role is implemented as a String in SQLite
-// Valid values: "USER", "ADMIN"
 
 model Agent {
   id               String   @id @default(uuid())
@@ -37,22 +34,22 @@ model Agent {
   autonomyLevel    Int      @default(0)
   pausedUntil      DateTime?
   alignmentScore   Float    @default(1)
-  preferences      String   @default("{}")
+  preferences      Json     @default("{}")
+  scenarioPreferences Json  @default("{}")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-  
-  // New fields
+
   onboardingCompleted Boolean               @default(false)
   lastInteraction     DateTime?
-  userKnowledge       String                @default("{}")
-  
-  // Relations
+  userKnowledge       Json                  @default("{}")
+
   user                User                  @relation(fields: [userId], references: [id])
   votes               Vote[]
   comments            Comment[]
   consents            ConsentEvent[]
   chatMessages        ChatMessage[]
   negotiationMessages NegotiationMessage[]
+  negotiationReactions NegotiationReaction[]
 }
 
 model Proposal {
@@ -69,13 +66,11 @@ model Proposal {
   createdAt        DateTime @default(now())
   closeAt          DateTime
   vetoWindowEnd    DateTime
-  
-  // New fields for negotiation
+
   negotiationId       String?              @unique
   isNegotiated        Boolean              @default(false)
   negotiationSummary  String?
-  
-  // Relations
+
   votes               Vote[]
   comments            Comment[]
   playMoneyLedgerEntry PlayMoneyLedgerEntry?
@@ -120,7 +115,7 @@ model ConsentEvent {
   userId    String
   agentId   String
   action    String
-  payload   String  // JSON as string for SQLite
+  payload   Json     @default("{}")
   signature String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
@@ -141,46 +136,41 @@ model SystemConfig {
 model AuditLog {
   id        String   @id @default(uuid())
   timestamp DateTime @default(now())
-  userId    String   // ID of the admin user performing the action
-  action    String   // Description of the action (e.g., "UPDATE_DEFAULT_MODEL")
-  targetId  String?  // Optional ID of the entity being changed (e.g., proposal ID, user ID)
-  details   String?  // Optional JSON blob for before/after values or other details
+  userId    String
+  action    String
+  targetId  String?
+  details   Json?
 }
 
 model LlmUsageLog {
   id           String   @id @default(uuid())
-  agentId      String?  // Optional if system action
+  agentId      String?
   model        String
   inputTokens  Int
   outputTokens Int
   latencyMs    Int
-  outcome      String   // success | error
+  outcome      String
   errorMessage String?
   createdAt    DateTime @default(now())
-
-  // Optional relation if needed later
-  // agent        Agent?   @relation(fields: [agentId], references: [id])
 }
 
 model PlayMoneyLedgerEntry {
   id          String   @id @default(uuid())
-  proposalId  String   @unique // Each non-playMode monetary proposal gets one entry upon execution
-  amount      Float    // Positive for income (unlikely?), negative for spending
-  balanceAfter Float   // The SystemConfig.playMoneyTreasury balance *after* this transaction
+  proposalId  String   @unique
+  amount      Float
+  balanceAfter Float
   createdAt   DateTime @default(now())
-
   proposal    Proposal @relation(fields: [proposalId], references: [id])
 }
 
-// New models for chat functionality
 model ChatMessage {
   id        String   @id @default(uuid())
   userId    String
   agentId   String
-  content   String   // Long messages for SQLite
-  sender    String   @default("user") // Either "user" or "agent"
+  content   String
+  sender    String   @default("user")
   timestamp DateTime @default(now())
-  metadata  String?  // Optional field for additional message metadata
+  metadata  Json?
   user      User     @relation(fields: [userId], references: [id])
   agent     Agent    @relation(fields: [agentId], references: [id])
 
@@ -193,14 +183,13 @@ model NegotiationSession {
   id           String               @id @default(uuid())
   topic        String
   description  String?
-  status       String               @default("active") // "active", "completed", "abandoned"
+  status       String               @default("active")
   startedAt    DateTime             @default(now())
   completedAt  DateTime?
-  initiatorId  String               // ID of the agent that started the negotiation
-  participants String               // Array of agent IDs participating (JSON string in SQLite)
+  initiatorId  String
   messages     NegotiationMessage[]
   proposal     Proposal?
-  
+
   @@index([status])
   @@index([startedAt])
 }
@@ -210,14 +199,48 @@ model NegotiationMessage {
   negotiationId      String
   agentId            String
   content            String
-  messageType        String             @default("statement") // Can be "statement", "question", "proposal", "agreement", "disagreement"
-  referencedMessageId String?           // For replies to specific messages
-  metadata           String?            // For additional structured data (JSON string in SQLite)
+  messageType        String             @default("statement")
+  referencedMessageId String?
+  metadata           Json?
   timestamp          DateTime           @default(now())
   negotiationSession NegotiationSession @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
   agent              Agent              @relation(fields: [agentId], references: [id])
+  reactions          NegotiationReaction[]
 
   @@index([negotiationId])
   @@index([agentId])
   @@index([timestamp])
+}
+
+model NegotiationReaction {
+  id             String   @id @default(uuid())
+  messageId      String
+  agentId        String
+  reactionType   String
+  createdAt      DateTime @default(now())
+  negotiationMessage NegotiationMessage @relation(fields: [messageId], references: [id])
+  agent          Agent    @relation(fields: [agentId], references: [id])
+  @@unique([messageId, agentId, reactionType])
+}
+
+// Example scenarios for onboarding
+model ExampleUserArchetype {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  interests   Json     @default("[]")
+  concerns    Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ExampleProposal {
+  id            String   @id @default(uuid())
+  title         String   @unique
+  description   String
+  category      String
+  stances       Json     @default("[]")
+  probeQuestion String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

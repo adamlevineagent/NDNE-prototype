@@ -64,3 +64,55 @@ describe('agent-service', () => {
     expect(llmLoggingService.logLlmUsage).toHaveBeenCalled();
   });
 });
+describe('Onboarding FSM', () => {
+  const dummyUserId = 'user-fsm';
+  const dummyAgentId = 'agent-fsm';
+
+  // Mock the agent and chat service dependencies as needed
+  beforeAll(() => {
+    // You may need to mock Prisma and chatService for full isolation
+  });
+
+  it('should progress from step 0 to step 1', async () => {
+    const result = await agentService.conductOnboardingChat(
+      dummyUserId,
+      dummyAgentId,
+      'Hello, call yourself Spark',
+      { step: 0 }
+    );
+    expect(result.nextStep).toBe(1);
+    expect(result.response).toContain('Welcome');
+  });
+
+  it('should accept issue selection and move to step 2', async () => {
+    const result = await agentService.conductOnboardingChat(
+      dummyUserId,
+      dummyAgentId,
+      '1,2',
+      { step: 1 }
+    );
+    expect(result.nextStep).toBe(2);
+    expect(result.metadata.selectedIssues).toContain('1');
+  });
+
+  it('should loop through selected issues in step 2', async () => {
+    const result = await agentService.conductOnboardingChat(
+      dummyUserId,
+      dummyAgentId,
+      'Support, clean water is essential',
+      { step: 2, selectedIssues: ['1', '2'], issueQueue: ['1', '2'], currentIssueIndex: 0 }
+    );
+    expect(result.nextStep).toBe(2); // Still in stance loop if more issues
+  });
+
+  it('should complete onboarding and return summary at step 8', async () => {
+    const result = await agentService.conductOnboardingChat(
+      dummyUserId,
+      dummyAgentId,
+      'done',
+      { step: 8 }
+    );
+    expect(result.completedOnboarding).toBe(true);
+    expect(result.response).toContain('All set');
+  });
+});

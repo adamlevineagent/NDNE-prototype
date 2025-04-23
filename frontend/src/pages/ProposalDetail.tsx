@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import apiClient from '../api/apiClient';
+import apiClient, { agents } from '../api/apiClient';
+import NegotiationThread from '../components/NegotiationThread';
 
 interface Vote {
   id: string;
@@ -26,12 +27,14 @@ interface ProposalDetail {
   closeAt: string;
   votes: Vote[];
   comments: Comment[];
+  negotiationId?: string; // Add negotiationId if present
 }
 
 const ProposalDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [proposal, setProposal] = useState<ProposalDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [agentId, setAgentId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProposal = async () => {
@@ -49,6 +52,18 @@ const ProposalDetail: React.FC = () => {
       fetchProposal();
     }
   }, [id]);
+
+  useEffect(() => {
+    const fetchAgent = async () => {
+      try {
+        const res = await agents.getAgent();
+        setAgentId(res.data.id);
+      } catch (err) {
+        setAgentId(null);
+      }
+    };
+    fetchAgent();
+  }, []);
 
   if (loading) {
     return <p>Loading proposal...</p>;
@@ -87,6 +102,18 @@ const ProposalDetail: React.FC = () => {
           </li>
         ))}
       </ul>
+      {/* Negotiation Thread */}
+      {proposal.negotiationId && agentId && (
+        <div
+          style={{ marginTop: "2rem" }}
+          role="region"
+          aria-label="Negotiation Thread for this Proposal"
+          tabIndex={0}
+        >
+          <h2>Negotiation Thread</h2>
+          <NegotiationThread negotiationId={proposal.negotiationId} agentId={agentId} />
+        </div>
+      )}
     </div>
   );
 };

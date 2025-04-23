@@ -1,0 +1,99 @@
+.negotiation-thread {
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.negotiation-messages {
+  margin-bottom: 1.5rem;
+}
+
+.negotiation-message {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+
+.reactions-row {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.reaction-btn {
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 16px;
+  padding: 0.2rem 0.8rem;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: background 0.2s, border 0.2s;
+}
+.reaction-btn.reacted {
+  background: #d1e7dd;
+  border-color: #198754;
+  color: #198754;
+}
+
+.negotiation-new-message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.negotiation-new-message textarea {
+  font-size: 1rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  padding: 0.5rem;
+  resize: vertical;
+}
+
+.negotiation-new-message button {
+  align-self: flex-end;
+  background: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.4rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.negotiation-new-message button:disabled {
+  background: #b0b0b0;
+  cursor: not-allowed;
+}
+
+.negotiation-list {
+  max-width: 700px;
+  margin: 2rem auto;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.feedback-modal {
+  /* already styled inline in component */
+}
+
+@media (max-width: 600px) {
+  .negotiation-thread, .negotiation-list {
+    padding: 0.5rem;
+    font-size: 0.95rem;
+  }
+  .negotiation-message {
+    padding: 0.5rem;
+  }
+  .negotiation-new-message button {
+    font-size: 0.95rem;
+    padding: 0.3rem 0.8rem;
+  }
+}

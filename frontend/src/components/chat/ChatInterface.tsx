@@ -8,54 +8,84 @@ export interface ChatInterfaceProps {
   agentId: string;
   isOnboarding?: boolean;
   onComplete?: () => void;  // For onboarding completion
+  onSendMessage?: (message: string) => Promise<void>;
+  onboardingStep?: number;
+  onboardingMetadata?: any;
+  newMessages?: ChatMessage[]; // New prop to receive messages to append
+  agentName?: string; // Add agentName prop
+  agentColor?: string; // Add agentColor prop
 }
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   content: string;
   sender: "user" | "agent";
   timestamp: string;
-  metadata?: any;
+  metadata?: {
+    isOnboarding?: boolean;
+    stage?: 'initial' | 'preferences' | 'priorities' | 'confirmation' | 'complete';
+    nextStage?: 'initial' | 'preferences' | 'priorities' | 'confirmation' | 'complete';
+    onboardingComplete?: boolean;
+    [key: string]: any;
+  };
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
   agentId,
   isOnboarding = false,
-  onComplete
+  onComplete,
+  onSendMessage,
+  onboardingStep,
+  onboardingMetadata,
+  newMessages, // Receive newMessages prop
+  agentName, // Receive agentName prop
+  agentColor // Receive agentColor prop
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [agent, setAgent] = useState<{ name: string; color: string } | null>(null);
-  
+  // Remove local agent state as it's now passed via props
+  // const [agent, setAgent] = useState<{ name: string; color: string } | null>(null);
+
+  // Log whenever props change
+  React.useEffect(() => {
+    console.log('[ChatInterface] Props changed:', {
+      agentId,
+      isOnboarding,
+      onboardingStep,
+      onboardingMetadata,
+      onSendMessage: !!onSendMessage,
+      newMessages: newMessages ? newMessages.length : 0, // Log newMessages length
+      agentName, // Log agentName
+      agentColor // Log agentColor
+    });
+  }, [agentId, isOnboarding, onboardingStep, onboardingMetadata, onSendMessage, newMessages, agentName, agentColor]); // Add agentName and agentColor to dependency array
+
   // Load initial messages
   useEffect(() => {
     const loadMessages = async () => {
       try {
         setLoading(true);
         setError(null);
-        
-        // Get agent details to display name and color
-        const agentResponse = await (window as any).fetch(`/api/agents/${agentId}`);
-        if (agentResponse.ok) {
-          const agentData = await agentResponse.json();
-          setAgent({
-            name: agentData.name || 'Agent',
-            color: agentData.color || '#007bff'
-          });
-        }
-        
+
+        // Agent details are now passed via props, no need to fetch here
+        // if (!agentName || !agentColor) {
+        //   // Optionally handle case where agent info is not yet available
+        //   console.warn('[ChatInterface] Agent name or color not available yet.');
+        // }
+
         // Get chat messages
-        const messagesResponse = await chat.getMessages(agentId, {
-          limit: 20,
-          onboarding: isOnboarding
+        const messagesResponse = await fetch(`/api/agents/${agentId}/messages?onboarding=${isOnboarding ? 'true' : 'false'}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
         });
-        
-        const data = messagesResponse.data;
+        const data = await messagesResponse.json();
         setMessages(data.messages || []);
-        setHasMore(data.hasMore || false);
+        setHasMore(false); // Pagination not implemented for custom endpoint
+        console.log('[ChatInterface] Loaded messages:', data.messages);
       } catch (err: any) {
         console.error('Failed to load messages:', err);
         setError('Failed to load messages. Please try again later.');
@@ -63,31 +93,44 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         setLoading(false);
       }
     };
-    
+
     loadMessages();
-  }, [agentId, isOnboarding]);
-  
+  }, [agentId, isOnboarding]); // Removed reloadKey from dependency array, keep agentId and isOnboarding
+
+  // Effect to append new messages when the newMessages prop changes
+  useEffect(() => {
+    if (newMessages && newMessages.length > 0) {
+      setMessages(prevMessages => {
+        // Filter out any temporary messages before appending
+        const filteredMessages = prevMessages.filter(msg => !msg.id.startsWith('temp-'));
+        const updatedMessages = [...filteredMessages, ...newMessages];
+        console.log('[ChatInterface] Appending new messages:', newMessages, 'Updated messages:', updatedMessages);
+        return updatedMessages;
+      });
+    }
+  }, [newMessages]); // Depend on newMessages prop
+
   // Load more messages
   const loadMoreMessages = useCallback(async () => {
     if (loading || !hasMore || messages.length === 0) return;
-    
+
     try {
       setLoading(true);
-      
+
       const oldestMessage = messages[0];
       const response = await chat.getMessages(agentId, {
         limit: 20,
         before: oldestMessage.timestamp,
         onboarding: isOnboarding
       });
-      
+
       const data = response.data;
-      
+
       setMessages(prevMessages => [
         ...(data.messages || []),
         ...prevMessages
       ]);
-      
+
       setHasMore(data.hasMore || false);
     } catch (err) {
       console.error('Failed to load more messages:', err);
@@ -96,88 +139,145 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       setLoading(false);
     }
   }, [agentId, hasMore, isOnboarding, loading, messages]);
-  
+
   // Send a new message
   const sendMessage = async (content: string) => {
+    if (onSendMessage) {
+      setSending(true);
+      setError(null);
+      try {
+        // onSendMessage is now responsible for updating messages state in parent
+        await onSendMessage(content);
+      } catch (err) {
+        setError('Failed to send message. Please try again.');
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    // Default legacy message sending logic (should not be used in OnboardingChat)
     if (sending || !content.trim()) return;
-    
     try {
       setSending(true);
       setError(null);
-      
+
       // Create a temporary user message to show immediately
       const tempUserMessage: ChatMessage = {
-        id: `temp-${Date.now()}`,
+        id: `temp-${Date.now()}`, // Temporary ID
         content,
         sender: 'user',
         timestamp: new Date().toISOString()
       };
-      
-      setMessages(prevMessages => [...prevMessages, tempUserMessage]);
-      
+
+      setMessages(prevMessages => {
+        const updated = [...prevMessages, tempUserMessage];
+        console.log('[ChatInterface] setMessages after user send (legacy):', updated);
+        return updated;
+      });
+
+      // Create metadata for the API request
+      let requestMetadata: any = { isOnboarding };
+
+      // Include current stage information if available from previous messages
+      if (isOnboarding && messages.length > 0) {
+        // Find the most recent agent message with stage info in metadata
+        const recentAgentMessages = [...messages]
+          .reverse()
+          .filter(m => m.sender === 'agent' && m.metadata);
+
+        const lastAgentWithStage = recentAgentMessages.find(m =>
+          m.metadata?.stage || m.metadata?.nextStage
+        );
+
+        if (lastAgentWithStage?.metadata) {
+          // Use nextStage if available, otherwise fallback to current stage
+          requestMetadata.stage = lastAgentWithStage.metadata.nextStage ||
+                                 lastAgentWithStage.metadata.stage ||
+                                 'initial';
+        }
+      }
+
       // Send message to API
       const response = await chat.sendMessage({
         agentId,
         content,
-        metadata: { isOnboarding }
+        metadata: requestMetadata
       });
-      
+
       const data = response.data;
-      
+
       // Replace temporary message with actual one and add agent response
       setMessages(prevMessages => {
-        const filteredMessages = prevMessages.filter(msg => msg.id !== tempUserMessage.id);
-        return [
+        const filteredMessages = prevMessages.filter(msg => !msg.id.startsWith('temp-'));
+        const updated = [
           ...filteredMessages,
           data.userMessage,
           data.agentMessage
         ];
+        console.log('[ChatInterface] setMessages after API response (legacy):', updated);
+        return updated;
       });
-      
+
       // Check if onboarding is completed from agent response metadata
-      if (isOnboarding && 
-          data.agentMessage.metadata && 
-          data.agentMessage.metadata.onboardingComplete && 
+      if (isOnboarding &&
+          data.agentMessage.metadata &&
+          (data.agentMessage.metadata.onboardingComplete ||
+           data.agentMessage.metadata.completedOnboarding) &&
           onComplete) {
-        onComplete();
+        // Allow a small delay to see the completion message before redirecting
+        setTimeout(() => {
+          onComplete();
+        }, 1500);
       }
     } catch (err: any) {
-      console.error('Failed to send message:', err);
-      setError('Failed to send message. Please try again later.');
-      
-      // Remove the temporary message on error
-      setMessages(prevMessages => 
-        prevMessages.filter(msg => msg.id !== `temp-${Date.now()}`)
-      );
+      console.error('Failed to send message (legacy):', err);
+      setError('Failed to send message. Please try again.');
+
+      // Remove the temporary message on error and add an error message
+      setMessages(prevMessages => {
+        // Use a safer approach that doesn't rely on the specific tempUserMessage variable
+        const filteredMessages = prevMessages.filter(msg => !msg.id.startsWith('temp-'));
+        return [
+          ...filteredMessages,
+          {
+            id: `error-${Date.now()}`,
+            content: "I'm sorry, there was an error processing your message. Please try again.",
+            sender: "agent",
+            timestamp: new Date().toISOString(),
+            metadata: { isError: true }
+          }
+        ];
+      });
     } finally {
       setSending(false);
     }
   };
-  
+
   return (
     <div className="chat-interface">
       {error && (
         <div className="chat-error">
           {error}
-          <button 
+          <button
             className="dismiss-error"
             onClick={() => setError(null)}
           >
             ×
-          </button>
+            </button>
         </div>
       )}
-      
+
       <div className="chat-container">
         <ChatHistory
           messages={messages}
           loadMore={loadMoreMessages}
           hasMore={hasMore}
           loading={loading}
-          agentColor={agent?.color}
-          agentName={agent?.name}
+          agentColor={agentColor} // Use prop
+          agentName={agentName} // Use prop
         />
-        
+
         <ChatInput
           onSendMessage={sendMessage}
           disabled={sending}

@@ -7,6 +7,7 @@ import { HttpError } from '../utils/HttpError';
 
 const router = Router();
 const prisma = new PrismaClient();
+import { callOpenRouterLLM } from "../services/llm-service";
 
 /**
  * @route POST /api/chat/messages
@@ -27,13 +28,15 @@ router.post('/messages', requireAuth, async (req: AuthenticatedRequest, res: Res
       throw new HttpError('Content and agentId are required', 400);
     }
 
-    // Verify the agent belongs to the user - Type assertion for now until migration is applied
+    // Debug logging for agent lookup
+    logger.info(`[Chat] userId from JWT: ${userId}, agentId from request: ${agentId}`);
     const agent = await (prisma as any).agent.findFirst({
       where: {
         id: agentId,
         userId: userId
       }
     });
+    logger.info(`[Chat] agent lookup result: ${agent ? JSON.stringify({ id: agent.id, userId: agent.userId }) : "not found"}`);
 
     if (!agent) {
       throw new HttpError('Agent not found or does not belong to user', 404);
@@ -51,19 +54,75 @@ router.post('/messages', requireAuth, async (req: AuthenticatedRequest, res: Res
       }
     });
 
-    // Process the message and get agent's response
-    // This would be implemented in a separate service
-    // For now, we'll mock a simple response
-    const agentResponse = await generateAgentResponse(userId, agentId, content);
+    // Fetch recent chat history for context (last 10 messages)
+    const recentMessages = await (prisma as any).chatMessage.findMany({
+      where: { userId, agentId },
+      orderBy: { timestamp: "desc" },
+      take: 10,
+    });
+    const contextMessages = recentMessages
+      .reverse()
+      .map((msg: any) => ({
+        role: msg.sender === "user" ? "user" : "assistant",
+        content: msg.content,
+      }));
 
-    // Save the agent's response - Type assertion for now until migration is applied
+    // Determine if this is part of onboarding
+    const isOnboarding = metadata && metadata.isOnboarding === true;
+    
+    // Generate response differently based on whether this is onboarding or regular chat
+    let agentResponse: string;
+    let responseMetadata = {};
+    
+    try {
+      if (isOnboarding) {
+        // Import agent service dynamically to avoid circular dependencies
+        const agentService = await import('../services/agent-service');
+        
+        // Get current onboarding stage from metadata or default to 'initial'
+        const currentStage = metadata.stage || 'initial';
+        
+        // Use conductOnboardingChat for onboarding messages
+        const result = await agentService.conductOnboardingChat(
+          userId,
+          agentId,
+          content,
+          currentStage
+        );
+        
+        agentResponse = result.response;
+        responseMetadata = {
+          isOnboarding: true,
+          stage: currentStage,
+          nextStage: result.nextStep,
+          onboardingComplete: result.completedOnboarding || false
+        };
+        
+        logger.info(`[Onboarding] Stage: ${currentStage} → ${result.nextStep}, Complete: ${result.completedOnboarding}`);
+      } else {
+        // Regular chat message - use standard LLM call
+        agentResponse = await callOpenRouterLLM({
+          prompt: content,
+          contextMessages,
+          model: "openai/gpt-4.1",
+          temperature: 0.7,
+          maxTokens: 256,
+        });
+      }
+    } catch (err: any) {
+      logger.error("Response generation failed:", err);
+      agentResponse = "Sorry, I couldn't process your message due to an internal error.";
+    }
+
+    // Save the agent's response with any special metadata - Type assertion for now until migration is applied
     const agentMessage = await (prisma as any).chatMessage.create({
       data: {
         userId,
         agentId,
         content: agentResponse,
         sender: 'agent',
-        timestamp: new Date()
+        timestamp: new Date(),
+        metadata: responseMetadata
       }
     });
 
@@ -232,11 +291,6 @@ router.delete('/messages/:id', requireAuth, async (req: AuthenticatedRequest, re
 
 // Placeholder function for generating agent responses
 // This will be implemented properly in the agent service
-async function generateAgentResponse(userId: string, agentId: string, message: string): Promise<string> {
-  logger.info(`Generating response for message from user ${userId} to agent ${agentId}`);
-  // In a real implementation, this would call the agent service to generate a response
-  // For now, return a simple acknowledgment
-  return `I received your message: "${message}". This is a placeholder response until the LLM integration is complete.`;
-}
+/* LLM integration now handled in main route */
 
 export default router;

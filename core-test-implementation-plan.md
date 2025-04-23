@@ -116,7 +116,7 @@ model NegotiationSession {
   startedAt    DateTime             @default(now())
   completedAt  DateTime?
   initiatorId  String               // ID of the agent that started the negotiation
-  participants Json                 // Array of agent IDs participating
+  // participants field removed: participation is now dynamic and based on message activity
   messages     NegotiationMessage[]
   proposal     Proposal?
   
@@ -146,12 +146,16 @@ model NegotiationMessage {
 - [x] Add ChatMessage model to schema
 - [x] Add NegotiationSession model to schema
 - [x] Add NegotiationMessage model to schema
-- [ ] Create migration (run `npx prisma migrate dev --name add_chat_models`) [In Progress - DB config issue]
-- [ ] Verify migration applied successfully
+- [x] Create migration (run `npx prisma migrate dev --name add_chat_models`)
+- [x] Verify migration applied successfully
 
 **Notes for implementor:**
 ```
-Add any observations or challenges encountered while implementing these changes here.
+- Removed SQLite config and switched to PostgreSQL.
+- Fixed DATETIME → TIMESTAMP for PostgreSQL compatibility.
+- Fixed enum/integer/string migration for User.role.
+- Ensured columns are added before updating them.
+- Migration now applies cleanly and database is in sync.
 ```
 
 ### 2. Extend Agent Model
@@ -192,12 +196,13 @@ model Agent {
 **✓ Checklist:**
 - [x] Add new fields to Agent model
 - [x] Ensure existing relations are maintained
-- [ ] Include in the same migration as chat models [In Progress - DB config issue]
-- [ ] Verify agent model updates successfully
+- [x] Include in the same migration as chat models
+- [x] Verify agent model updates successfully
 
 **Notes for implementor:**
 ```
-Add any observations or challenges encountered while implementing these changes here.
+- Confirmed new fields added and migration applied.
+- See above for migration fixes.
 ```
 
 ### 3. Extend Proposal Model
@@ -235,24 +240,66 @@ model Proposal {
 **✓ Checklist:**
 - [x] Add new fields to Proposal model
 - [x] Add relation to NegotiationSession
-- [ ] Include in the same migration as chat models [In Progress - DB config issue]
-- [ ] Verify proposal model updates successfully
+- [x] Include in the same migration as chat models
+- [x] Verify proposal model updates successfully
 
 **Notes for implementor:**
 ```
-Add any observations or challenges encountered while implementing these changes here.
+- Confirmed new fields added and migration applied.
+- See above for migration fixes.
 ```
 
 ## Implementation Approach
 
 ### Phase 1: Chat-based Onboarding (Foundation)
 
+---
+
+### **Negotiation System Participation & Reactions Update**
+
+#### Negotiation Participation
+
+- Negotiations are now inherently public: any agent can read any negotiation.
+- "Participants" are defined as agents who have posted at least one message in the negotiation.
+- Any agent can join a negotiation at any time by posting a message.
+- The UI and API should allow agents to view, join, and participate in any negotiation.
+
+#### Reactions System
+
+- Every negotiation message can receive attributed reactions (e.g., support, non-support, emoji).
+- Reactions are non-binding, lightweight signals, and are attributed to agent IDs.
+- Any agent (participant or observer) can react to any message, enabling straw polling and broad engagement.
+- The UI should display reaction counts and which agents have reacted to each message.
+
+**New Model: NegotiationReaction**
+```prisma
+model NegotiationReaction {
+  id             String   @id @default(uuid())
+  messageId      String
+  agentId        String
+  reactionType   String   // e.g., "support", "non-support", "like", "dislike", "emoji"
+  createdAt      DateTime @default(now())
+  negotiationMessage NegotiationMessage @relation(fields: [messageId], references: [id])
+  agent          Agent    @relation(fields: [agentId], references: [id])
+  @@unique([messageId, agentId, reactionType]) // Prevent duplicate reactions
+}
+```
+
+**✓ Checklist:**
+- [ ] Add NegotiationReaction model to schema
+- [ ] Create migration for reactions
+- [ ] Implement API endpoints for adding/removing reactions
+- [ ] Update negotiation message API to include reactions
+- [ ] Update UI to display and allow reactions
+
+---
+
 #### 1. Create Chat Message Model and API Endpoints
 
 **Task:** Create the database models and API endpoints for chat functionality
 
 **✓ Checklist:**
-- [ ] Complete database schema changes (see [Database Schema Extensions](#database-schema-extensions))
+- [x] Complete database schema changes (see [Database Schema Extensions](#database-schema-extensions))
 - [x] Create `backend/src/routes/chat.ts` with the following endpoints:
   - [x] `POST /api/chat/messages` - Create a new chat message
   - [x] `GET /api/chat/messages` - Get chat history with pagination
@@ -383,9 +430,9 @@ Add implementation notes here, including any design decisions or UI/UX considera
   - [x] Message history management
   - [x] Context window management
   - [x] Message storage and retrieval
-- [ ] Define prompt templates for different conversation scenarios in `backend/src/services/prompt-templates/`:
-  - [ ] `onboarding-prompts.ts`
-  - [ ] `chat-prompts.ts`
+- [x] Define prompt templates for different conversation scenarios in `backend/src/services/prompt-templates/`:
+  - [x] `onboarding-prompts.ts`
+  - [x] `chat-prompts.ts`
 
 **Function Specifications:**
 
@@ -734,8 +781,10 @@ Add implementation notes here, focusing on how personalization is implemented.
   - [ ] `POST /api/negotiations` - Create a new negotiation session
   - [ ] `GET /api/negotiations` - List negotiations
   - [ ] `GET /api/negotiations/:id` - Get session details
-  - [ ] `POST /api/negotiations/:id/messages` - Add a message to negotiation
+  - [ ] `POST /api/negotiations/:id/messages` - Add a message to negotiation (any agent can post to join)
   - [ ] `GET /api/negotiations/:id/messages` - Get negotiation messages
+  - [ ] `POST /api/negotiations/:id/messages/:messageId/reactions` - Add a reaction to a message
+  - [ ] `DELETE /api/negotiations/:id/messages/:messageId/reactions` - Remove a reaction
 
 **API Specifications:**
 
@@ -745,7 +794,7 @@ Add implementation notes here, focusing on how personalization is implemented.
 interface CreateNegotiationRequest {
   topic: string;
   description?: string;
-  participants: string[]; // Array of agent IDs
+  // participants field removed; any agent can join by posting
 }
 
 // Response:
@@ -757,7 +806,7 @@ interface NegotiationResponse {
   startedAt: string;
   completedAt?: string;
   initiatorId: string;
-  participants: string[];
+  // participants field removed; participants are agents who have posted
 }
 
 // POST /api/negotiations/:id/messages
@@ -780,12 +829,32 @@ interface NegotiationMessageResponse {
   referencedMessageId?: string;
   metadata?: object;
   timestamp: string;
+  reactions: NegotiationReactionResponse[]; // New: reactions for this message
+}
+
+// POST /api/negotiations/:id/messages/:messageId/reactions
+// Request body:
+interface CreateNegotiationReactionRequest {
+  agentId: string;
+  reactionType: string; // e.g., "support", "non-support", "like", "dislike", "emoji"
+}
+
+// Response:
+interface NegotiationReactionResponse {
+  id: string;
+  messageId: string;
+  agentId: string;
+  reactionType: string;
+  createdAt: string;
 }
 ```
 
 **Notes for implementor:**
 ```
-Add implementation notes here, focusing on the negotiation protocol design decisions.
+- Negotiations are public and open to all agents.
+- Participation is dynamic: any agent who posts is a participant.
+- Reactions allow for lightweight, attributed signaling on any message.
+- API and UI should support open reading, joining, and reacting.
 ```
 
 #### 2. Implement Negotiation Service
@@ -870,9 +939,9 @@ Add implementation notes here, focusing on the negotiation process logic.
 - Negotiation service must be implemented
 
 **✓ Checklist:**
-- [ ] Create `backend/src/services/prompt-templates/negotiation-prompts.ts` with:
-  - [ ] `NEGOTIATION_SYSTEM_PROMPT` - Base prompt for agent negotiation
-  - [ ] `CONSENSUS_CHECKING_PROMPT` - Prompt for determining consensus
+- [x] Create `backend/src/services/prompt-templates/negotiation-prompts.ts` with:
+  - [x] `NEGOTIATION_SYSTEM_PROMPT` - Base prompt for agent negotiation
+  - [x] `CONSENSUS_CHECKING_PROMPT` - Prompt for determining consensus
   - [ ] Templates for different negotiation stages
 - [ ] Implement prompt generation in negotiation service:
   - [ ] `generateNegotiationPrompt(negotiationId: string, agentId: string): Promise<string>`
@@ -1385,9 +1454,20 @@ Add implementation notes here, focusing on testing strategies and performance op
 
 ### Phase 1: Chat-based Onboarding
 
+---
+
+### Negotiation System Participation & Reactions (Update)
+
+- Negotiations are public and open to all agents.
+- Participation is dynamic: any agent who posts is a participant.
+- Any agent can react to any message, enabling straw polling and lightweight signaling.
+- The UI should display reactions and allow agents to join by posting.
+
+---
+
 | Task | Status | Assigned To | Started | Completed | Notes |
 |------|--------|-------------|---------|-----------|-------|
-| Database Schema Changes | ⚠️ Partial | | 4/23/2025 | | Migration created but not applied due to config issue |
+| Database Schema Changes | ✅ Done | | 4/23/2025 | 4/23/2025 | Migration applied after fixing DB config, type issues, and migration order |
 | Chat API Endpoints | ✅ Done | | 4/23/2025 | 4/23/2025 | Implemented in backend/src/routes/chat.ts |
 | Chat UI Components | ✅ Done | | 4/23/2025 | 4/23/2025 | Created ChatInterface, ChatMessage, ChatInput, and ChatHistory components |
 | LLM Chat Logic | ✅ Done | | 4/23/2025 | 4/23/2025 | Implemented in agent-service.ts |
@@ -1405,8 +1485,8 @@ Add implementation notes here, focusing on testing strategies and performance op
 
 | Task | Status | Assigned To | Started | Completed | Notes |
 |------|--------|-------------|---------|-----------|-------|
-| Negotiation Protocol | 🔄 To Do | | | | |
-| Negotiation Service | 🔄 To Do | | | | |
+| Negotiation Protocol | 🟡 In Progress | | 4/23/2025 | | API endpoints and service scaffolding complete; JSON string handling for participants/metadata |
+| Negotiation Service | 🟡 In Progress | | 4/23/2025 | | Service file scaffolded, ready for business logic |
 | Agent Representation | 🔄 To Do | | | | |
 | Preference Translation | 🔄 To Do | | | | |
 
@@ -1457,16 +1537,19 @@ Add implementation notes here, focusing on testing strategies and performance op
 
 ## Next Steps
 
-1. Resolve the database migration issues to apply schema changes
-2. Implement prompt templates in separate files for better organization
-3. Complete the agent-to-agent negotiation system (Phase 3)
-4. Connect negotiations to proposals (Phase 4)
-5. Finalize UI/UX and integration (Phase 5)
-6. Conduct comprehensive testing of the chat-based onboarding and agent chat features
+1. Implement the NegotiationReaction model, migration, and API endpoints for reactions on negotiation messages.
+2. Update backend and frontend logic to support public, open negotiations where any agent can join by posting.
+3. Ensure all negotiation UI displays reactions and allows agents to react to any message (straw poll/attributed support).
+4. Complete the agent-to-agent negotiation system (Phase 3) with dynamic participation and reactions.
+5. Connect negotiations to proposals (Phase 4).
+6. Finalize UI/UX and integration (Phase 5).
+7. Conduct comprehensive testing of the chat-based onboarding, agent chat, and negotiation features.
 
 ## Progress Summary (as of 4/23/2025)
 
-We have successfully implemented the core chat functionality for the NDNE prototype:
+We have successfully implemented the core chat functionality for the NDNE prototype.
+
+**Major design update:** Negotiations are now public and open to all agents. Participation is dynamic (any agent who posts is a participant), and all negotiation messages support attributed reactions (support, non-support, emoji, etc.) for lightweight straw polling and engagement.
 
 ### Completed Components:
 1. **Backend Components:**

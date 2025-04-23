@@ -131,4 +131,54 @@ export const chat = {
     apiClient.delete(`/chat/messages/${id}`),
 };
 
+export const negotiations = {
+  // Get all negotiation sessions
+  getAll: () => apiClient.get('/negotiations'),
+
+  // Get a single negotiation session
+  getById: (id: string) => apiClient.get(`/negotiations/${id}`),
+
+  // Create a new negotiation session
+  create: (data: { topic: string; description?: string; initiatorId: string }) =>
+    apiClient.post('/negotiations', data),
+
+  // Get all messages for a negotiation (with reactions)
+  getMessages: (negotiationId: string) =>
+    apiClient.get(`/negotiations/${negotiationId}/messages`),
+
+  // Post a new message to a negotiation
+  postMessage: (
+    negotiationId: string,
+    data: {
+      agentId: string;
+      content: string;
+      messageType?: string;
+      referencedMessageId?: string;
+      metadata?: any;
+    }
+  ) => apiClient.post(`/negotiations/${negotiationId}/messages`, data),
+
+  // Add a reaction to a message
+  addReaction: (
+    negotiationId: string,
+    messageId: string,
+    data: { agentId: string; reactionType: string }
+  ) =>
+    apiClient.post(
+      `/negotiations/${negotiationId}/messages/${messageId}/reactions`,
+      data
+    ),
+
+  // Remove a reaction from a message
+  removeReaction: (
+    negotiationId: string,
+    messageId: string,
+    data: { agentId: string; reactionType: string }
+  ) =>
+    apiClient.delete(
+      `/negotiations/${negotiationId}/messages/${messageId}/reactions`,
+      { data }
+    ),
+};
+
 export default apiClient;

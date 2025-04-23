@@ -13,6 +13,9 @@ import feedbackRouter from './routes/agents/feedbackHandler'; // Import the feed
 import onboardingRouter from './routes/onboarding'; // Import the onboarding router
 import adminRouter from './routes/admin'; // Import the admin router
 import chatRouter from './routes/chat'; // Import the chat router
+import negotiationRouter from './routes/negotiation'; // Import the negotiation router
+import agentMeRouter from './routes/agents/me'; // Import the agent "me" router
+import agentRouter from './routes/agents/index'; // Import the main agent router
 
 dotenv.config();
 
@@ -50,6 +53,9 @@ app.use('/api/agents', feedbackRouter); // Mount the feedback router
 app.use('/api/onboarding', onboardingRouter); // Mount the onboarding router
 app.use('/api/admin', adminRouter); // Mount the admin router
 app.use('/api/chat', chatRouter); // Mount the chat router
+app.use('/api', negotiationRouter); // Mount the negotiation router
+app.use('/api/agents', agentMeRouter); // Mount the agent "me" router
+app.use('/api/agents', agentRouter); // Mount the main agent router
 
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });

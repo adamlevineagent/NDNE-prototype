@@ -5,7 +5,7 @@ CREATE TABLE "ChatMessage" (
     "agentId" TEXT NOT NULL,
     "content" TEXT NOT NULL,
     "sender" TEXT NOT NULL DEFAULT 'user',
-    "timestamp" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "timestamp" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "metadata" TEXT,
     CONSTRAINT "ChatMessage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "ChatMessage_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "Agent" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
@@ -17,8 +17,8 @@ CREATE TABLE "NegotiationSession" (
     "topic" TEXT NOT NULL,
     "description" TEXT,
     "status" TEXT NOT NULL DEFAULT 'active',
-    "startedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "completedAt" DATETIME,
+    "startedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" TIMESTAMP,
     "initiatorId" TEXT NOT NULL,
     "participants" TEXT NOT NULL
 );
@@ -32,7 +32,7 @@ CREATE TABLE "NegotiationMessage" (
     "messageType" TEXT NOT NULL DEFAULT 'statement',
     "referencedMessageId" TEXT,
     "metadata" TEXT,
-    "timestamp" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "timestamp" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "NegotiationMessage_negotiationId_fkey" FOREIGN KEY ("negotiationId") REFERENCES "NegotiationSession" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "NegotiationMessage_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "Agent" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
@@ -40,20 +40,20 @@ CREATE TABLE "NegotiationMessage" (
 -- Modify Role handling
 ALTER TABLE "User" RENAME COLUMN "role" TO "_temp_role";
 ALTER TABLE "User" ADD COLUMN "role" TEXT NOT NULL DEFAULT 'USER';
-UPDATE "User" SET "role" = 'USER' WHERE "_temp_role" = 0;
-UPDATE "User" SET "role" = 'ADMIN' WHERE "_temp_role" = 1;
+UPDATE "User" SET "role" = 'USER' WHERE "_temp_role" = 'USER';
+UPDATE "User" SET "role" = 'ADMIN' WHERE "_temp_role" = 'ADMIN';
 ALTER TABLE "User" DROP COLUMN "_temp_role";
+
+-- AlterTable
+ALTER TABLE "Agent" ADD COLUMN "onboardingCompleted" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Agent" ADD COLUMN "lastInteraction" TIMESTAMP;
+ALTER TABLE "Agent" ADD COLUMN "userKnowledge" TEXT NOT NULL DEFAULT '{}';
 
 -- Convert JSON fields to String
 UPDATE "Agent" SET "preferences" = '{}' WHERE "preferences" IS NULL;
 UPDATE "Agent" SET "userKnowledge" = '{}' WHERE "userKnowledge" IS NULL;
 UPDATE "ConsentEvent" SET "payload" = '{}' WHERE "payload" IS NULL;
 UPDATE "AuditLog" SET "details" = '{}' WHERE "details" IS NULL;
-
--- AlterTable
-ALTER TABLE "Agent" ADD COLUMN "onboardingCompleted" BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE "Agent" ADD COLUMN "lastInteraction" DATETIME;
-ALTER TABLE "Agent" ADD COLUMN "userKnowledge" TEXT NOT NULL DEFAULT '{}';
 
 -- AlterTable
 ALTER TABLE "Proposal" ADD COLUMN "negotiationId" TEXT;
