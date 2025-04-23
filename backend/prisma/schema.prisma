@@ -1,0 +1,158 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DB_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  passwordHash     String
+  publicKey        String
+  encryptedPrivKey String
+  role             Role     @default(USER) // Add role field
+  digestFrequency  Int      @default(24)
+  digestTone       String   @default("neutral")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  agent            Agent?
+  consents         ConsentEvent[]
+  digests          Digest[]
+}
+
+// Define Role enum
+enum Role {
+  USER
+  ADMIN
+}
+
+model Agent {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  name             String
+  color            String
+  publicKey        String
+  encryptedPrivKey String
+  autonomyLevel    Int      @default(0)
+  pausedUntil      DateTime?
+  alignmentScore   Float    @default(1)
+  preferences      Json
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id])
+  votes            Vote[]
+  comments         Comment[]
+  consents         ConsentEvent[]
+}
+
+model Proposal {
+  id               String   @id @default(uuid())
+  title            String
+  description      String
+  type             String   @default("standard")
+  playMode         Boolean  @default(false)
+  amount           Float?
+  createdByAgentId String
+  status           String   @default("open")
+  quorum           Int
+  threshold        Float    @default(0.5)
+  createdAt        DateTime @default(now())
+  closeAt          DateTime
+  vetoWindowEnd    DateTime
+  votes            Vote[]
+  comments         Comment[]
+  playMoneyLedgerEntry PlayMoneyLedgerEntry? // Relation for play money ledger
+}
+
+model Vote {
+  id             String   @id @default(uuid())
+  proposalId     String
+  agentId        String
+  value          String
+  confidence     Float
+  createdAt      DateTime @default(now())
+  revokedAt      DateTime?
+  overrideByUser Boolean  @default(false)
+  overrideReason String?
+  proposal       Proposal @relation(fields: [proposalId], references: [id])
+  agent          Agent    @relation(fields: [agentId], references: [id])
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  proposalId String
+  agentId    String
+  content    String
+  createdAt  DateTime @default(now())
+  revokedAt  DateTime?
+  proposal   Proposal @relation(fields: [proposalId], references: [id])
+  agent      Agent    @relation(fields: [agentId], references: [id])
+}
+
+model Digest {
+  id          String   @id @default(uuid())
+  userId      String
+  content     String
+  generatedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model ConsentEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  agentId   String
+  action    String
+  payload   Json
+  signature String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  agent     Agent    @relation(fields: [agentId], references: [id])
+}
+
+model SystemConfig {
+  id                   Int      @id @default(1)
+  defaultModel         String   @default("openai/gpt-4o")
+  modelsEndpoint       String   @default("https://openrouter.ai/api/v1/models")
+  playMoneyTreasury    Float    @default(100000)
+  maxMonetaryNoConsent Float    @default(500)
+  keyStorageMode       String   @default("server")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  timestamp DateTime @default(now())
+  userId    String   // ID of the admin user performing the action
+  action    String   // Description of the action (e.g., "UPDATE_DEFAULT_MODEL")
+  targetId  String?  // Optional ID of the entity being changed (e.g., proposal ID, user ID)
+  details   Json?    // Optional JSON blob for before/after values or other details
+}
+
+model LlmUsageLog {
+  id           String   @id @default(uuid())
+  agentId      String?  // Optional if system action
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  latencyMs    Int
+  outcome      String   // success | error
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  // Optional relation if needed later
+  // agent        Agent?   @relation(fields: [agentId], references: [id])
+}
+
+model PlayMoneyLedgerEntry {
+  id          String   @id @default(uuid())
+  proposalId  String   @unique // Each non-playMode monetary proposal gets one entry upon execution
+  amount      Float    // Positive for income (unlikely?), negative for spending
+  balanceAfter Float   // The SystemConfig.playMoneyTreasury balance *after* this transaction
+  createdAt   DateTime @default(now())
+
+  proposal    Proposal @relation(fields: [proposalId], references: [id])
+}

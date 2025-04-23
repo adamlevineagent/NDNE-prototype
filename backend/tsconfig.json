@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "typeRoots": ["node_modules/@types", "src/types"],
+    "types": ["node", "jest"] // Add jest types here
+  },
+  "include": ["src", "prisma"]
+}

@@ -13,6 +13,8 @@ This document captures the testing process, findings, and fixes implemented duri
 | Authentication | User registration | ❌ Failing (409) | ⚠️ Partial | Email already in use error handled, but UX could be improved |
 | API Endpoints | `/api/auth/me` endpoint | ❌ Missing | ✅ Fixed | Added `/api/auth/me` endpoint to match frontend client expectations |
 | Frontend Client | API path consistency | ❌ Failing | ✅ Fixed | Updated `apiClient.ts` to use correct endpoint paths |
+| Database | PostgreSQL connection | ❌ Failing | ✅ Fixed | Docker containers need to be running for database connectivity |
+| Frontend | Veto/Undo functionality | ❌ Failing (timeout) | ✅ Fixed | Implemented proper timeout handling and better UI feedback |
 
 ## Issues & Fixes
 
@@ -181,3 +183,51 @@ I used browser-based testing to validate frontend-backend interactions:
 1. Attempted to test Veto/Undo functionality in the Recent Actions section but encountered a timeout error
 2. Proposals and Settings pages contain placeholder content and need implementation
 3. The agent color selector in onboarding process lacks a visual color picker UI (requires hex input)
+
+## System Configuration & Database Testing - 4/23/2025 Update
+
+### Database Connection Issues
+1. Identified major issue: PostgreSQL database connection failures causing login errors
+   - Error symptom: 500 Internal Server Error during login attempts
+   - Root cause: Docker not running, preventing connection to PostgreSQL database
+   - Fix: Ensured Docker daemon was running and started containers with `docker-compose up -d postgres redis`
+   - Verified fix: Login now returns proper response (401 Invalid credentials with correct error message)
+
+### Veto/Undo Functionality Improvements
+1. Identified issues with the veto/undo implementation in DashboardPage.tsx:
+   - Error symptom: Timeout errors when attempting to veto/undo agent actions
+   - Problems:
+     - No timeout handling in API calls
+     - Entire page reloading after veto action
+     - Poor error feedback to users
+     - No loading state indicators
+   
+2. Implemented fixes:
+   - Added 15-second timeout handling for veto API calls
+   - Replaced page reload with React state updates
+   - Added clear error/success messaging UI
+   - Implemented loading indicators during API calls
+   - Fixed API client import issues (proper import of `agents` from apiClient)
+   - Added background data refresh after successful veto
+
+3. Testing results:
+   - Veto buttons now show loading state during API calls
+   - Users receive clear feedback messages after veto operations
+   - Timeout handling prevents UI from hanging indefinitely
+   - State updates properly reflect veto status without page reload
+
+### Environment Setup Testing
+1. Created comprehensive documentation for environment setup requirements:
+   - Docker daemon must be running
+   - PostgreSQL and Redis containers must be started
+   - Added these details to HANDOFF.md for future developers
+
+### Next Testing Steps
+1. Complete end-to-end testing of the veto/undo functionality with real data
+2. Test proposal creation and voting flows
+3. Complete implementation and testing of the Settings page
+4. Implement and test the Proposals page functionality
+
+---
+
+*This test log was updated on 4/23/2025 as part of the ongoing NDNE prototype testing process.*
