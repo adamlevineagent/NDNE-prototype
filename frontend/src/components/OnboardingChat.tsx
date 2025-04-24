@@ -176,9 +176,13 @@ const OnboardingChat: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
+        // Update step and metadata states immediately
         setStep(data.nextStep ?? 0);
         setMetadata(data.metadata || {});
+        console.log('[OnboardingChat] State updated: step', data.nextStep, 'metadata', data.metadata);
+
         // Re-fetch agent info after onboarding answers to update name/color
+        // This is important to get the potentially updated agent name and color
         try {
           const agentData = await fetchAgentInfo();
           // Update agent state with the new data, including the name
@@ -187,10 +191,14 @@ const OnboardingChat: React.FC = () => {
              // Assuming agentData structure is compatible with ChatInterface's agent prop
              // ChatInterface expects { name: string; color: string }
              setAgent({ name: agentData.name, color: agentData.color });
+             console.log('[OnboardingChat] Agent state updated after fetch:', { name: agentData.name, color: agentData.color });
+          } else {
+            console.log('[OnboardingChat] fetchAgentInfo returned no data after message.');
           }
         } catch (err) {
            console.error("Failed to re-fetch agent info after message:", err);
         }
+
         if (data.completedOnboarding) {
           handleOnboardingComplete();
         }

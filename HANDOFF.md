@@ -18,13 +18,13 @@ Significant progress has been made on the onboarding flow:
 *   **Live Chat Updates (FIXED):** The frontend now optimistically adds the user's message to the chat immediately after sending. The backend response containing the saved user and agent messages is then used to update the chat history, replacing the temporary message and adding the agent's reply.
 *   **Agent's First Message Context (PARTIALLY FIXED):** The initial greeting at step 0 is now handled directly without an LLM call if the user's message is empty.
 
-## Remaining Issue
+## Resolved Issue
 
-*   **Agent's Response Name:** When the user provides a nickname for the agent (at step 0), the agent's subsequent response content still uses the old default name ("Agent") instead of the new nickname.
+*   **Agent's Response Name:** The issue where the agent's response content used the old default name ("Agent") instead of the new nickname provided at step 0 has been fixed.
 
-## Technical Details of Remaining Issue
+## Technical Details of Resolved Issue
 
-The `conductOnboardingChat` function in `backend/src/services/agent-service.ts` updates the agent's name in the database after processing the user's message at step 0. However, the LLM prompt for the agent's response is constructed *before* this database update is reflected in the `agent` object used to build the prompt. Therefore, the LLM uses the old name when generating the response content.
+The `conductOnboardingChat` function in `backend/src/services/agent-service.ts` was modified to update the agent's name in the database immediately after processing the user's message at step 0. Additionally, the `saveMessage` function in `backend/src/services/chat-service.ts` was updated to accept and use the current agent name when saving agent messages, ensuring the correct name is included in the message metadata sent to the frontend. The frontend's `ChatMessage.tsx` component was updated to prioritize the agent name from message metadata if available.
 
 ## Files Modified
 
@@ -37,7 +37,6 @@ The `conductOnboardingChat` function in `backend/src/services/agent-service.ts` 
 
 ## Next Steps
 
-1.  **Fix Agent Name in Response:** Modify the `conductOnboardingChat` function in `backend/src/services/agent-service.ts`. After the database update for the agent's name at step 0, ensure the updated agent object (or at least the new name) is used when constructing the LLM prompt for the agent's response. This might involve re-fetching the agent object or manually updating the agent object in memory before building the prompt.
-2.  **Continue Onboarding Implementation:** Proceed with implementing the remaining steps of the 8-step FSM in `conductOnboardingChat` and the corresponding frontend updates in `OnboardingChat.tsx`.
-3.  **Implement Preference Extraction Logic:** Refine the `extractPreferences` function in `backend/src/services/preference-extractor.ts` to accurately parse the required preferences from the conversation history based on the FSM steps.
-4.  **Testing:** Add comprehensive unit and E2E tests for the completed and remaining parts of the onboarding flow as outlined in `core-test-implementation-plan.md`.
+1.  **Continue Onboarding Implementation:** Proceed with implementing the remaining steps of the 8-step FSM in `conductOnboardingChat` and the corresponding frontend updates in `OnboardingChat.tsx`.
+2.  **Implement Preference Extraction Logic:** Refine the `extractPreferences` function in `backend/src/services/preference-extractor.ts` to accurately parse the required preferences from the conversation history based on the FSM steps.
+3.  **Testing:** Add comprehensive unit and E2E tests for the completed and remaining parts of the onboarding flow as outlined in `core-test-implementation-plan.md`.

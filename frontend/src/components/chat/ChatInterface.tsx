@@ -99,6 +99,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   // Effect to append new messages when the newMessages prop changes
   useEffect(() => {
+    // Roo Debug: Log newMessages and agentName when newMessages changes - Attempt 3
+    console.log('[ChatInterface] useEffect [newMessages] triggered. newMessages:', newMessages, 'agentName:', agentName);
     if (newMessages && newMessages.length > 0) {
       setMessages(prevMessages => {
         // Filter out any temporary messages before appending
@@ -108,7 +110,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         return updatedMessages;
       });
     }
-  }, [newMessages]); // Depend on newMessages prop
+  }, [newMessages, agentName]); // Depend on newMessages and agentName prop
 
   // Load more messages
   const loadMoreMessages = useCallback(async () => {

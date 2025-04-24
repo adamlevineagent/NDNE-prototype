@@ -92,7 +92,8 @@ export async function saveMessage(
   agentId: string,
   content: string,
   sender: 'user' | 'agent',
-  metadata: any = {}
+  metadata: any = {},
+  agentName?: string // Add agentName parameter
 ): Promise<any> {
   try {
     // Type assertion workaround until migration is applied
@@ -102,7 +103,10 @@ export async function saveMessage(
         agentId,
         content,
         sender,
-        metadata,
+        metadata: {
+          ...metadata,
+          ...(sender === 'agent' && { agentName: agentName || (await prisma.agent.findUnique({ where: { id: agentId }, select: { name: true } }))?.name || 'Agent' }) // Use passed agentName or fetch
+        },
         timestamp: new Date()
       }
     });

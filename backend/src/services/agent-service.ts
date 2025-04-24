@@ -329,6 +329,7 @@ export async function conductOnboardingChat(
     if (!agent) {
       throw new Error(`Agent with ID ${agentId} not found`);
     }
+    console.log(`[conductOnboardingChat] Agent fetched. Initial name: ${agent.name}`);
 
     // FSM state
     const step = metadata?.step ?? 0;
@@ -367,11 +368,31 @@ To get started, please pick a short name for me to use when we chat. (You can ca
 
 To get started, please pick a short name for me to use when we chat. (You can call me anything you like—something friendly, memorable, or just "Agent" if you prefer!)`;
           nextStep = 1;
+
+          // Attempt to extract nickname from the message
+          const nicknameMatch = message.match(/^['"]?(.+?)['"]?[.!]?$/);
+          if (nicknameMatch && nicknameMatch[1]) {
+            const newName = nicknameMatch[1].trim();
+            agent.name = newName; // Update agent name in memory
+            console.log(`[conductOnboardingChat] Nickname extracted and agent name updated in memory: ${agent.name}`);
+
+            // Update agent name in the database immediately
+            await prisma.agent.update({
+              where: { id: agentId },
+              data: { name: newName }
+            });
+            console.log(`[conductOnboardingChat] Agent name updated in database: ${agent.name}`);
+
+          } else {
+            console.log(`[conductOnboardingChat] No nickname extracted. Agent name remains: ${agent.name}`);
+          }
+
+          console.log(`[conductOnboardingChat] Agent name before LLM call: ${agent.name}`);
            // Compose prompt for LLM
             messagesForLlm = [
               {
                 role: 'system',
-                content: `${systemPrompt}\n\nCurrent onboarding step: ${step}\n${issuesForMenu ? `Current issues: ${issuesForMenu}` : ''}\n\n${stepInstructions}`
+                content: `${systemPrompt}\n\nCurrent onboarding step: ${step}\n${issuesForMenu ? `Current issues: ${issuesForMenu}` : ''}\n\n${stepInstructions}\n\nAgent's current name: ${agent.name}` // Include updated agent name in prompt
               },
               ...context.map(msg => ({
                 role: msg.role,
@@ -619,7 +640,7 @@ To get started, please pick a short name for me to use when we chat. (You can ca
       step,
       nextStep,
       completedOnboarding
-    });
+    }, agent.name); // Pass the updated agent name
 
     // Mark onboarding complete in DB
     if (completedOnboarding) {
