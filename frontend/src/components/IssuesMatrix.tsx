@@ -98,27 +98,35 @@ const IssuesMatrix: React.FC<IssuesMatrixProps> = ({
                       </span>
                     )}
                   </div>
-                  {issue.description && (
+                  {issue.description && issue.description.trim() !== '' && (
                     <div className="issue-description">
                       <span className="description-label">Description:</span>
                       <span className="description-text">{issue.description}</span>
                     </div>
                   )}
-                  {(issue.summary ||
+                  {(
+                    (issue.summary && issue.summary.trim() !== '') ||
                     (issue.reason &&
-                      typeof issue.reason === 'string' &&
-                      issue.reason !== null &&
-                      !/^\d+(,\s*\d+)*$/.test(issue.reason.trim())
+                      (
+                        (typeof issue.reason === 'string' &&
+                         issue.reason.trim() !== '' &&
+                         !/^\d+(,\s*\d+)*$/.test(issue.reason.trim()))
+                        ||
+                        (Array.isArray(issue.reason) && issue.reason.length > 0)
+                      )
                     )
                   ) && (
                     <div className="issue-reason">
                       <span className="reason-label">Perspective:</span>
-                      {issue.summary && (
+                      {issue.summary && issue.summary.trim() !== '' && (
                         <div className="summary-text">
                           {issue.summary}
                         </div>
                       )}
-                      {issue.reason && issue.reason !== issue.summary && (
+                      {issue.reason &&
+                       ((typeof issue.reason === 'string' && issue.reason.trim() !== '') ||
+                        (Array.isArray(issue.reason) && issue.reason.length > 0)) &&
+                       issue.reason !== issue.summary && (
                         Array.isArray(issue.reason) ? (
                           <ul className="reason-bullets">
                             {issue.reason.map((point, idx) => (

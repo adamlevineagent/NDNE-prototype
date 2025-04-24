@@ -11,6 +11,7 @@ This document outlines the detailed plan for redesigning the NDNE dashboard with
 6. [Shared Components](#shared-components)
 7. [Implementation Phases](#implementation-phases)
 8. [Technical Considerations](#technical-considerations)
+9. [Detailed Technical Specifications](#detailed-technical-specifications)
 
 ## Overview
 
@@ -112,18 +113,33 @@ graph TD
 - **Quick Guidance**: Brief explanation of what the matrix shows and how to use it
 - **Empty State**: Friendly message when no positions exist yet with guidance on how to start
 
-### Data Flow:
-- Load user profile data and all issues data when tab is mounted
-- Apply filters (default: only issues with positions)
-- Track last update timestamp for sorting
-- When "Discuss" is clicked, populate chat context and switch focus to chat
-- When agent updates an issue via chat, refresh the matrix data
+### State Variables
+- `positionsFilter: 'positionsOnly' | 'all'` - Controls filtering of issues
+- `sortedIssues: Issue[]` - Issues sorted by last update timestamp
+- `selectedIssueId: string | null` - Currently selected issue for discussion
 
-### API Endpoints Needed:
-- `GET /api/issues` - Fetch all issues with positions
-- `GET /api/issues/all` - Fetch all available issues
-- `POST /api/issues/:id/discuss` - Prepare chat context for discussing an issue
-- `PUT /api/issues/:id` - Update issue information
+### API Routes
+- `GET /api/issues?filter=positionsOnly` - Fetch issues with user positions
+- `GET /api/issues?filter=all` - Fetch all issues sorted by last update
+- `POST /api/issues/:id/discuss` - Prepare chat context for issue discussion
+- `PUT /api/issues/:id` - Update issue details (title, stance, reason, summary)
+
+### Component Props
+- `IssuesMatrix`:
+  - `issues: Issue[]`
+  - `filter: string`
+  - `onDiscuss(issueId: string): void`
+- `IssueCard`:
+  - `issue: Issue`
+  - `onDiscuss(): void`
+
+### Data Flow
+- On tab mount, fetch issues with `positionsOnly` filter
+- On toggle, fetch all issues
+- On discuss button click, call `POST /api/issues/:id/discuss` and open chat with context
+- On chat update, call `PUT /api/issues/:id` to update issue data and refresh matrix
+
+---
 
 ## Tab 2: Activity Audit
 
@@ -191,18 +207,34 @@ graph TD
 - **Quick Guidance**: Brief explanation of how to read and use the activity feed
 - **Empty State**: Friendly message when no activity exists yet
 
-### Data Flow:
-- Load user profile data and recent activities when tab is mounted (paginated)
-- Apply filters as selected
-- Load more activities when scrolling
-- When "Respond" is clicked, populate chat context
-- When "View Context" is clicked, navigate to relevant tab/content
+### State Variables
+- `activityFilter: { type?: string; issueId?: string; dateRange?: [Date, Date] }`
+- `activityList: Activity[]`
+- `expandedActivityId: string | null`
 
-### API Endpoints Needed:
-- `GET /api/activity` - Fetch paginated activity feed
-- `GET /api/activity/filter` - Fetch filtered activity
-- `POST /api/activity/:id/respond` - Prepare chat context for responding to activity
-- `GET /api/activity/:id/context` - Get contextual information for an activity
+### API Routes
+- `GET /api/activity?type=&issueId=&dateRange=` - Fetch filtered activity list
+- `POST /api/activity/:id/respond` - Prepare chat context for responding
+- `GET /api/activity/:id/context` - Fetch context for activity item
+
+### Component Props
+- `ActivityFeed`:
+  - `activities: Activity[]`
+  - `filter: object`
+  - `onRespond(activityId: string): void`
+  - `onViewContext(activityId: string): void`
+- `ActivityItem`:
+  - `activity: Activity`
+  - `expanded: boolean`
+  - `onToggleExpand(): void`
+
+### Data Flow
+- On tab mount, fetch recent activities with default filters
+- On filter change, refetch activities
+- On respond, open chat with context
+- On view context, navigate to related tab/content
+
+---
 
 ## Tab 3: Proposals
 
@@ -245,8 +277,10 @@ graph TD
 
 ### Component Structure:
 1. **ProposalsTab** - Main container for proposals
+   - Includes personalized header (e.g., "Hi [Name], ready to create something new?")
    - Contains proposal list and new proposal button
    - Manages state for current view (list, create, detail)
+   - Features instructional guidance for proposal creation process
 
 2. **ProposalList** - List of existing proposals
    - Filterable by status, type, etc.
@@ -268,59 +302,61 @@ graph TD
 - **Quick Guidance**: Brief explanation of how proposals work and how to collaborate with your agent
 - **Empty State**: Encouraging message when no proposals exist yet
 
-### Data Flow:
-- Load user profile data and proposals when tab is mounted
-- When creating new proposal:
-  1. Start dialogue with agent about proposal idea
-  2. Agent helps refine and structure the proposal
-  3. Form fields auto-populate based on dialogue
-  4. Agent provides viability assessment
-  5. Submit or continue refining
-- Proposals can be linked to negotiations for wider discussion
+### State Variables
+- `proposalList: Proposal[]`
+- `currentProposalId: string | null`
+- `proposalDraft: ProposalDraft`
 
-### API Endpoints Needed:
+### API Routes
 - `GET /api/proposals` - Fetch user's proposals
-- `POST /api/proposals/draft` - Save proposal draft
-- `POST /api/proposals` - Submit final proposal
-- `POST /api/proposals/:id/assessment` - Get agent's assessment of proposal viability
-- `POST /api/proposals/:id/negotiate` - Submit proposal to negotiation system
+- `POST /api/proposals/draft` - Save draft
+- `POST /api/proposals` - Submit proposal
+- `POST /api/proposals/:id/assessment` - Get viability assessment
+- `POST /api/proposals/:id/negotiate` - Submit to negotiation
 
-## Shared Components
+### Component Props
+- `ProposalList`:
+  - `proposals: Proposal[]`
+  - `onSelect(proposalId: string): void`
+- `ProposalForm`:
+  - `draft: ProposalDraft`
+  - `onChange(draft: ProposalDraft): void`
+  - `onSubmit(): void`
+- `ProposalDetail`:
+  - `proposal: Proposal`
+  - `onEdit(): void`
+  - `onSubmitToNegotiation(): void`
 
-Several components and services will be shared across all tabs to ensure consistent functionality and user experience.
+### Data Flow
+- Load proposals on tab mount
+- On create/edit, update draft state
+- On submit, call API and update list
+- On assessment, display agent feedback
+- On negotiation submit, transition to negotiation tab
 
-### 1. Enhanced ChatPanel
-- Persistent across tabs
-- Context-aware based on current view
-- Maintains conversation history
-- Provides action buttons relevant to current context
-- Addresses user by name in conversation
-- Uses friendly, conversational tone
+---
 
-### 2. Navigation Utilities
-- Links between related content (e.g., from Activity to Source Issue)
-- Breadcrumb trail for complex interactions
-- "Back to" links for returning to previous contexts
+## Shared Components and Utilities
 
-### 3. Data Refresh System
-- Real-time updates when changes occur in any tab
-- WebSocket connection for immediate notifications
-- Optimistic UI updates with fallback
+### Chat Panel
+- Props:
+  - `agentId: string`
+  - `context: ChatContext`
+  - `onAction(action: ChatAction): void`
+- Features:
+  - Maintains conversation state
+  - Updates context based on current tab and selected item
+  - Personalized greetings using user name from onboarding
 
-```mermaid
-graph TD
-    A[Shared Components] --> B[Enhanced ChatPanel]
-    A --> C[Navigation Utilities]
-    A --> D[Data Refresh System]
-    
-    B --> E[Context Awareness]
-    B --> F[Conversation Memory]
-    B --> G[Action Triggers]
-    
-    E -->|Updates based on| H[Current Tab/Content]
-    F -->|Maintains| I[Conversation State]
-    G -->|Triggers| J[Tab-Specific Actions]
-```
+### Navigation Utilities
+- Functions to link between tabs and pass context
+- Breadcrumb component for navigation history
+
+### Data Refresh
+- WebSocket connection to backend for real-time updates
+- Optimistic UI updates with rollback on failure
+
+---
 
 ## Implementation Phases
 
@@ -369,7 +405,7 @@ graph TD
 
 3. **Week 3: Cross-Tab Navigation**
    - Implement context links to other tabs
-   - Create deep linking functionality
+   - Create deep linking functionality 
    - Add real-time feed updates
    - Refine personalized guidance and tooltips
 
@@ -393,7 +429,7 @@ graph TD
 ### Phase 5: Integration & Refinement (2 weeks)
 1. **Week 1: Cross-Tab Integration**
    - Finalize cross-tab navigation
-   - Refine shared components
+   - Refine shared components 
    - Optimize data loading and caching
    - Ensure consistent tone and personalization across all tabs
 
@@ -454,12 +490,6 @@ graph TD
 - Use responsive design patterns for layout
 - Consider touch interactions for mobile devices
 - Implement adaptive chat panel for smaller screens
-
-### 5. Mobile Responsiveness
-- Design for desktop-first but ensure tablet compatibility
-- Use responsive design patterns for layout
-- Consider touch interactions for mobile devices
-- Implement adaptive chat panel for smaller screens
 - Maintain personalized elements even in constrained layouts
 
 ### 6. Personalization
@@ -481,6 +511,4 @@ graph TD
 - End-to-end tests for critical paths
 - Accessibility testing with automated tools
 
-This comprehensive plan provides a roadmap for implementing the three-tab dashboard with interconnections between components. By following the implementation phases, we can deliver a cohesive, intuitive user experience that allows users to effectively manage their positions, review activity, and collaborate on proposals with their agent.
-
-The personalized elements will make the dashboard feel welcoming and tailored to each user, addressing them by name and providing clear guidance throughout their journey. This personal touch will enhance user engagement and make the complex functionality more approachable and friendly.
+This detailed technical specification ensures any developer can implement the dashboard redesign without ambiguity, using consistent variable names, API routes, and component interfaces.

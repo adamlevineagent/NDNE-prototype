@@ -56,7 +56,8 @@ app.use('/api/chat', chatRouter); // Mount the chat router
 app.use('/api', negotiationRouter); // Mount the negotiation router
 app.use('/api/agents', agentMeRouter); // Mount the agent "me" router
 app.use('/api/agents', agentRouter); // Mount the main agent router
-
+import issuesRouter from './routes/issues'; // Import the new issues router
+app.use('/api/issues', issuesRouter); // Mount the issues router
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });

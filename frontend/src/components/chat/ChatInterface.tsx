@@ -228,8 +228,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       if (isOnboarding &&
           data.agentMessage.metadata &&
           (data.agentMessage.metadata.onboardingComplete ||
-           data.agentMessage.metadata.completedOnboarding) &&
+           data.agentMessage.metadata.completedOnboarding ||
+           data.agentMessage.metadata.completedOnboarding === true) &&
           onComplete) {
+        console.log('[ChatInterface] Onboarding complete detected in metadata:', data.agentMessage.metadata);
         // Allow a small delay to see the completion message before redirecting
         setTimeout(() => {
           onComplete();

@@ -16,10 +16,17 @@ fi
 
 # Kill the backend server - it runs on port 4000
 echo "Stopping backend server..."
-BACKEND_PID=$(lsof -t -i:4000 2>/dev/null)
-if [ ! -z "$BACKEND_PID" ]; then
-  echo "Found backend server process: $BACKEND_PID"
-  kill $BACKEND_PID
+BACKEND_PIDS=$(lsof -t -i:4000 2>/dev/null)
+if [ ! -z "$BACKEND_PIDS" ]; then
+  echo "Found backend server process(es): $BACKEND_PIDS"
+  for pid in $BACKEND_PIDS; do
+    kill $pid
+    sleep 2
+    if kill -0 $pid 2>/dev/null; then
+      echo "Process $pid still running, sending SIGKILL"
+      kill -9 $pid
+    fi
+  done
   echo "Backend server stopped"
 else
   echo "No backend server found running on port 4000"

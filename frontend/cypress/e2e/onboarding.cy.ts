@@ -43,6 +43,13 @@ describe('Onboarding Flow', () => {
 
     // Step 8: Summary and completion
     cy.findByText(/All set!/i).should('be.visible');
+    
+    // Verify no JSON appears in final message
+    cy.get('.agent-message')
+      .last()
+      .should('not.contain', '{')
+      .should('not.contain', '"agentNickname"')
+      .should('not.contain', '"selectedIssues"');
 
     // Verify redirection to dashboard
     cy.url().should('include', '/dashboard');

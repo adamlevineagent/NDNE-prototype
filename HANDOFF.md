@@ -26,20 +26,53 @@
 - **Remaining Issue:** The bug persists where the selection string appears as "Key Points" for the first issue. Further debugging is needed, likely focusing on the exact timing and data flow between the backend FSM state transitions and the frontend state updates.
 
 ### Issue 4: Step Counter Incorrect
-**(New)** The UI shows "Step X of 7" but there are 8 steps (0-7).
-- **Fix:** Updated `OnboardingProgress` in `OnboardingChat.tsx` to show "Step X of 8".
+**(Resolved)** The UI shows "Step X of 9" for the updated 9-step process (steps 0-8).
+- **Fix:** Updated `OnboardingProgress` in `OnboardingChat.tsx` to show "Step X of 9".
+- **Fix:** Fixed step numbering inconsistency in `onboarding-prompts.ts` by updating the step list to correctly use steps 0-8 (9 steps total).
+- **Fix:** Fixed duplicate "Step 2" in the step list to ensure correct progression through all steps.
 
 ### Issue 5: User Name Not Collected
-**(New)** The onboarding flow does not ask for the user's actual name.
-- **Plan:** Add a new step 0 to ask for the user's name, update Prisma schema, save name to User model, update prompts, and update step counter to 9 steps (0-8). *(Partially attempted, needs completion)*.
+**(Resolved)** The onboarding flow now asks for the user's name at step 0.
+- **Fix:** Added step 0 to ask for the user's name and update the User model.
+- **Fix:** Updated step numbering in prompts and UI to account for 9 steps (0-8).
+- **Fix:** Modified agent-service.ts to save the user's name to the database.
 
 ### Issue 6: JSON Output in Chat
-**(New)** The final onboarding step outputs the raw JSON preference summary into the chat window.
-- **Plan:** Remove the JSON summary from the final step's `agentResponseContent` in `agent-service.ts`.
+**(Resolved)** The final onboarding step no longer outputs raw JSON preference summary.
+- **Fix:** Removed JSON summary instruction from `onboarding-prompts.ts`.
+- **Fix:** Updated the final step instructions to only show a friendly message.
+- **Fix:** Added explicit JSON filtering in `agent-service.ts` to prevent any JSON from appearing in the final response.
+- **Fix:** Enhanced the extraction prompt to specify that JSON is for internal use only.
+- **Fix:** Fixed step numbering consistency in default messages (1/9 instead of 1/7).
+- **Fix:** Added more robust JSON detection using a regex that searches for specific JSON keys.
 
 ### Issue 7: No Redirect After Onboarding
-**(New)** Completing onboarding no longer redirects the user to the dashboard.
-- **Plan:** Investigate `handleSendMessage` and `handleOnboardingComplete` in `OnboardingChat.tsx` to ensure `navigate('/dashboard')` is called correctly when `completedOnboarding` is true.
+**(Resolved)** Onboarding now correctly redirects to the dashboard upon completion.
+- **Fix:** Added additional metadata field `onboardingComplete` for compatibility.
+- **Fix:** Added logging to help debug completion detection issues.
+- **Fix:** Added redundant completion checks on both the response object and agent message metadata.
+- **Fix:** Enhanced error handling to prevent silent failures.
+- **Fix:** Fixed an issue where `onboardingCompleted` was not being set consistently by adding a check to always mark onboarding as completed in step 8.
+- **Fix:** Added additional debug logging to verify that `onboardingCompleted` is being properly set.
+- **Additional Fixes (April 24):**
+  - Enhanced onboarding completion detection to check multiple conditions (step=8 or nextStep>=8)
+  - Added robust retry mechanisms for setting the `onboardingCompleted` flag in the database
+  - Improved `handleOnboardingComplete` with multiple navigation approaches and timeout fallbacks
+  - Enhanced the initial agent check to properly use the improved navigation method
+  - Added early returns after navigation triggers to prevent further code execution
+
+### Issue with Issues Matrix
+**(New - Resolved)** The Issues Matrix was displaying "Key Points: 1, 5, 6" incorrectly for the first issue.
+- **Fix:** Prevented issue selection string from being stored as reason in agent-service.ts.
+- **Fix:** Enhanced type checking in IssuesMatrix.tsx to properly handle reason/summary fields.
+- **Fix:** Added support for description fields in issue matrices.
+- **Fix:** Added better empty string checking to avoid rendering empty fields.
+
+### Issue 8: Final Message Still Shows Step Indicator
+**(Resolved)** The final onboarding message no longer displays "Step 7 of 9" or any step indicator.
+- **Fix:** Removed the step number prefix "(9/9)" from the final agent response in `agent-service.ts`
+- **Fix:** Ensured the final message appears without any step indicator or numbering
+- **Fix:** Added additional logging to verify the correct formatting of the final message
 
 ## Resetting Onboarding State
 
@@ -68,4 +101,4 @@ If you need to reset the onboarding process for a user to test changes:
 4.  **Refresh Frontend:** Refresh the onboarding page (`/onboarding`) in the browser. The process should start again from step 0.
 
 ---
-*This document reflects the state as of 2025-04-23 10:45 PM PT.*
+*This document reflects the state as of 2025-04-24 7:25 AM PT.*
