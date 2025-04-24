@@ -18,11 +18,11 @@ const OnboardingProgress: React.FC<OnboardingProgressProps> = ({ step }) => {
       <div className="progress-bar">
         <div
           className="progress-fill"
-          style={{ width: `${((step + 1) / 8) * 100}%` }}
+          style={{ width: `${((step + 1) / 9) * 100}%` }}
         ></div>
       </div>
       <div className="stage-label">
-        Step {step + 1} of 8
+        Step {step + 1} of 9
       </div>
     </div>
   );
@@ -75,8 +75,12 @@ const OnboardingChat: React.FC = () => {
         setAgentId(data.id);
         setAgent({ name: data.name, color: data.color }); // Update agent state with fetched data
         
+        // Enhanced check for initial page load
+        console.log('[OnboardingChat] Initial agent fetch - onboardingCompleted status:', data.onboardingCompleted);
+        
         if (data.onboardingCompleted) {
-          navigate('/dashboard');
+          console.log('[OnboardingChat] Onboarding already completed, redirecting to dashboard');
+          handleOnboardingComplete();
           return;
         }
         
@@ -99,7 +103,7 @@ const OnboardingChat: React.FC = () => {
               // Create a temporary agent message to show immediately
               const tempAgentMessage: ChatMessage = {
                 id: `temp-greeting-${Date.now()}`,
-                content: "(1/7) Welcome! I'm your Praxis Agent. Pick a short name for me when we chat.",
+                content: "(1/9) Welcome! What is your name?",
                 sender: 'agent',
                 timestamp: new Date().toISOString(),
                 metadata: {
@@ -182,7 +186,26 @@ const OnboardingChat: React.FC = () => {
 
   // Handler for onboarding completion
   const handleOnboardingComplete = () => {
-    navigate('/dashboard');
+    console.log('[OnboardingChat] handleOnboardingComplete called, navigating to dashboard');
+    
+    // Update local state to indicate completion
+    try {
+      // Force agent refresh on dashboard load
+      localStorage.setItem('agent_refresh_needed', 'true');
+      
+      // Navigate to dashboard
+      navigate('/dashboard');
+      
+      // Set a timeout just in case the navigation doesn't trigger
+      setTimeout(() => {
+        console.log('[OnboardingChat] Navigation timeout, forcing redirect');
+        window.location.href = '/dashboard';
+      }, 500);
+    } catch (err) {
+      console.error('[OnboardingChat] Error during navigation to dashboard:', err);
+      // Force direct navigation if React router fails
+      window.location.href = '/dashboard';
+    }
   };
 
   // Generate a random color for a new agent
@@ -240,14 +263,21 @@ const OnboardingChat: React.FC = () => {
 
         // LIVE POSITIONS MATRIX UPDATE: If extractedPreferences.issuesMatrix is present, update immediately
         if (data.extractedPreferences && Array.isArray(data.extractedPreferences.issuesMatrix)) {
+          // Log what we received from backend
+          console.log('[OnboardingChat] Received issuesMatrix from backend:',
+                     JSON.stringify(data.extractedPreferences.issuesMatrix));
+          
           // Map backend issuesMatrix to Issue[] for the component
           const liveMatrix: Issue[] = data.extractedPreferences.issuesMatrix.map((issue: any) => ({
             id: issue.id,
             title: issue.title || `Issue ${issue.id}`,
             stance: issue.stance,
-            reason: issue.reason,
+            reason: issue.reason || issue.summary, // Use summary as fallback for reason
+            description: issue.description || '',
             isPriority: !!issue.isPriority
           }));
+          
+          console.log('[OnboardingChat] Updated issue matrix:', JSON.stringify(liveMatrix));
           setIssueMatrix(liveMatrix);
         }
 
@@ -300,8 +330,29 @@ const OnboardingChat: React.FC = () => {
         } catch (err) {
         }
 
-        if (data.completedOnboarding) {
+        // Enhanced onboarding completion detection with extra logging
+        console.log('[OnboardingChat] Checking onboarding completion flags:', {
+          dataCompletedFlag: data.completedOnboarding,
+          step: step,
+          nextStep: data.nextStep,
+          messageMetadata: data.agentMessage?.metadata
+        });
+
+        if (data.completedOnboarding || step >= 8 || data.nextStep >= 8) {
+          console.log('[OnboardingChat] Detected completedOnboarding flag, redirecting to dashboard');
           handleOnboardingComplete();
+          return; // Immediately return to ensure redirection happens
+        }
+
+        // Additional check for the metadata of the agent message
+        if (data.agentMessage &&
+            data.agentMessage.metadata &&
+            (data.agentMessage.metadata.completedOnboarding ||
+             data.agentMessage.metadata.onboardingComplete ||
+             data.agentMessage.metadata.step >= 8)) {
+          console.log('[OnboardingChat] Detected completion in agent message metadata, redirecting to dashboard');
+          handleOnboardingComplete();
+          return; // Immediately return to ensure redirection happens
         }
         // Pass the new messages to ChatInterface to append
         const newMessages: ChatMessage[] = []; // Explicitly type newMessages array

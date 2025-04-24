@@ -359,36 +359,57 @@ export async function conductOnboardingChat(
 
     // FSM logic
     switch (step) {
-      case 0: // Greeting & Nickname
-        stepInstructions = `(1/7) Welcome! I'm your Praxis Agent. Pick a short name for me when we chat.`;
+      case 0: // Collect User Name
+        stepInstructions = `(1/9) Welcome! What is your name?`;
         nextStep = 1;
-        
-        // Update agent name immediately if user provided one
+        // No processing of message needed in this step, just asking for the name.
+        break;
+
+      case 1: // Greeting & Nickname
+        stepInstructions = `(2/9) Nice to meet you, ${message.trim()}! I'm your Praxis Agent. Pick a short name for me when we chat.`;
+        nextStep = 2;
+
+        // Save user's name
         if (message && message.trim()) {
-          // Extract name from user message and update agent name immediately
-          const name = message.trim();
           try {
-            await prisma.agent.update({
-              where: { id: agentId },
-              data: { name }
+            await prisma.user.update({
+              where: { id: userId },
+              data: { name: message.trim() }
             });
-            console.log(`[Onboarding/FSM] Updated agent name to: ${name}`);
+            console.log(`[Onboarding/FSM] Updated user name to: ${message.trim()}`);
           } catch (err) {
-            console.error('[Onboarding/FSM] Failed to update agent name:', err);
+            console.error('[Onboarding/FSM] Failed to update user name:', err);
           }
+        }
+
+        // Update agent name immediately if user provided one in this step (if they skipped step 0)
+        // This logic might need refinement based on how strictly we enforce step order.
+        // For now, assuming step 1 message is either agent name or user name if step 0 was just completed.
+        // We'll prioritize saving user name if step 0 was just completed.
+        // If step was 1 and message is not just a name (e.g., "Call me AgentX"), update agent name.
+        if (step === 1 && message && message.trim() && !/^\s*\S+\s*$/.test(message.trim())) {
+             const name = message.trim();
+             try {
+               await prisma.agent.update({
+                 where: { id: agentId },
+                 data: { name }
+               });
+               console.log(`[Onboarding/FSM] Updated agent name to: ${name}`);
+             } catch (err) {
+               console.error('[Onboarding/FSM] Failed to update agent name:', err);
+             }
         }
         break;
 
-      case 1: // Issue Menu
-        stepInstructions = `(2/7) Here are the issues being discussed right now. Reply with the numbers you care about (e.g., 1,3,5).
-
+      case 2: // Issue Menu
+        stepInstructions = `(3/9) Here are the issues being discussed right now. Reply with the numbers you care about (e.g., 1,3,5).
         ${issuesForMenu}`;
-        nextStep = 2;
+        nextStep = 3;
 
         // Process the user's response to extract selected issues
         if (message) {
           selectedIssues = extractIssueNumbers(message);
-          issueQueue = [...selectedIssues]; // Create a queue for step 2
+          issueQueue = [...selectedIssues]; // Create a queue for step 3
           // [DEBUG] Selected issues and mapping
           console.log(`[Onboarding/FSM] Selected issues: ${selectedIssues.join(',')} (Raw message: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}")`);
           // Save selected issues to DB for the frontend to access and update the issues matrix
@@ -397,7 +418,7 @@ export async function conductOnboardingChat(
               where: { id: agentId },
               select: { preferences: true }
             }))?.preferences || {};
-            
+
             // Create an issues matrix array to populate the frontend matrix
             const issueList = [];
             for (const issueId of selectedIssues) {
@@ -407,21 +428,25 @@ export async function conductOnboardingChat(
                 issueList.push({
                   id: issueId,
                   title: issueDetail.title || `Issue ${issueId}`,
+                  description: issueDetail.description || '',
                   stance: null,
-                  reason: null,
+                  reason: '', // Empty string, not null
+                  summary: '',
                   isPriority: false
                 });
               } else {
                 issueList.push({
                   id: issueId,
                   title: `Issue ${issueId}`,
+                  description: '',
                   stance: null,
-                  reason: null,
+                  reason: '', // Empty string, not null
+                  summary: '',
                   isPriority: false
                 });
               }
             }
-            console.log('[Onboarding/FSM][Step 1 SAVE] Initial issuesMatrix to save:', JSON.stringify(issueList, null, 2));
+            console.log('[Onboarding/FSM][Step 2 SAVE] Initial issuesMatrix to save:', JSON.stringify(issueList, null, 2));
             await prisma.agent.update({
               where: { id: agentId },
               data: {
@@ -439,28 +464,28 @@ export async function conductOnboardingChat(
         }
         break;
 
-      case 2: // Stance Loop
+      case 3: // Stance Loop
         if (issueQueue.length === 0) {
           // If no more issues to process, move to next step
-          nextStep = 3;
-          stepInstructions = generateStep3Instruction();
+          nextStep = 4;
+          stepInstructions = generateStep4Instruction(); // Updated step number
           break;
         }
 
         const currentIssueNumber = issueQueue[0];
         const currentIssue = issueDetails[Number(currentIssueNumber)]; // Cast to Number
-        
+
         if (!currentIssue) {
           // If issue not found, skip it
           issueQueue.shift();
           stepInstructions = `I don't have details for that issue. Let's move on.`;
           break;
         }
-        
+
         // Generate balanced perspectives for the current issue in format matching BALANCED_ISSUE_PRESENTATION
         // [DEBUG] Generating balanced perspectives for issue
         console.log('[Onboarding/FSM] Generating balanced perspectives for issue:', currentIssue.title);
-        
+
         let perspectivesText = "";
         if (currentIssue.stances && currentIssue.stances.length > 0) {
           // Format similar to our template example - using Approach A, B, C format
@@ -477,7 +502,7 @@ export async function conductOnboardingChat(
         }
 
         // Generate stance question for current issue with balanced perspectives
-        stepInstructions = `(3/7) Issue ${currentIssueNumber} – ${currentIssue.title}:\n\n${currentIssue.description}\n\nBALANCED PERSPECTIVE:\n${perspectivesText}\n\nAfter considering these perspectives, do you prefer approach A, B, C or something else? One-line reason.`;
+        stepInstructions = `(4/9) Issue ${currentIssueNumber} – ${currentIssue.title}:\n\n${currentIssue.description}\n\nBALANCED PERSPECTIVE:\n${perspectivesText}\n\nAfter considering these perspectives, do you prefer approach A, B, C or something else? One-line reason.`;
 
         // Process the user's response to extract stance on the previous issue
         // Only update the matrix if the message is not just a list of numbers (i.e., not the issue selection)
@@ -493,11 +518,17 @@ export async function conductOnboardingChat(
             // Log matrix state *before* attempting update in this step
             const agentDataBeforeUpdate = await prisma.agent.findUnique({ where: { id: agentId }, select: { preferences: true } });
             const matrixBeforeUpdate = (typeof agentDataBeforeUpdate?.preferences === 'object' ? agentDataBeforeUpdate?.preferences as Record<string, any> : {}).issuesMatrix || [];
-            console.log('[Onboarding/FSM][Step 2 PRE-UPDATE] issuesMatrix before processing stance:', JSON.stringify(matrixBeforeUpdate, null, 2));
+            console.log('[Onboarding/FSM][Step 3 PRE-UPDATE] issuesMatrix before processing stance:', JSON.stringify(matrixBeforeUpdate, null, 2)); // Updated step number
 
             // Extract stance and reason from the message (Approach A/B/C or custom)
             let stance = null;
             let reason = message.trim();
+            
+            // Make sure we don't use the issue selection string as a reason
+            if (/^\d+(,\s*\d+)*$/.test(reason.trim())) {
+              reason = ''; // Use empty string instead of null to avoid type error
+            }
+            
             const approachMatch = message.match(/\b(Approach\s*[A-C]|[A-C])\b/i);
             // Map stance letter to balanced perspective text
             let mappedSummary = '';
@@ -528,20 +559,20 @@ export async function conductOnboardingChat(
             const currentIssueId = issueQueue[0];
             if (currentIssueId) {
               console.log(`[Onboarding/FSM] Updating stance for issue #${currentIssueId} with stance: ${stance}, reason: ${reason.substring(0, 50)}...`);
-              
+
               // Update the issues matrix in agent preferences
               const currentAgentData = await prisma.agent.findUnique({
                 where: { id: agentId },
                 select: { preferences: true }
               });
-              
+
               const prefsObj = typeof currentAgentData?.preferences === 'object' ?
                 currentAgentData?.preferences as Record<string, any> :
                 {};
-                
+
               let issuesMatrix = prefsObj.issuesMatrix || [];
               const existingIssueIndex = issuesMatrix.findIndex((i: any) => i.id === currentIssueId);
-              
+
               if (existingIssueIndex >= 0 && stance) {
                 // Update existing issue
                 issuesMatrix[existingIssueIndex] = {
@@ -553,7 +584,7 @@ export async function conductOnboardingChat(
                   description: currentIssue?.description || ''
                 };
               }
-              
+
               // Save updated matrix
               await prisma.agent.update({
                 where: { id: agentId },
@@ -564,7 +595,7 @@ export async function conductOnboardingChat(
                   } as Prisma.InputJsonValue
                 }
               });
-              
+
               console.log(`[Onboarding/FSM] Updated issue stance in matrix:`, JSON.stringify(issuesMatrix[existingIssueIndex]));
               // Log the full issuesMatrix after update
               const updatedAgent = await prisma.agent.findUnique({
@@ -585,7 +616,7 @@ export async function conductOnboardingChat(
                 }
                 updatedMatrix = prefsObj.issuesMatrix || [];
               }
-              console.log('[Onboarding/FSM][DEBUG] issuesMatrix after update:', JSON.stringify(updatedMatrix, null, 2));
+              console.log('[Onboarding/FSM][DEBUG] issuesMatrix after update:', JSON.stringify(updatedMatrix, null, 2)); // Updated step number
             }
           } catch (err) {
             console.error('[Onboarding] Error updating issue stance:', err);
@@ -595,21 +626,21 @@ export async function conductOnboardingChat(
         // Pop the issue from queue after processing
         issueQueue.shift();
 
-        // If queue is now empty, we'll advance to step 3 on next message
+        // If queue is now empty, we'll advance to step 4 on next message
         if (issueQueue.length === 0) {
-          nextStep = 3;
+          nextStep = 4;
         }
         break;
 
-      case 3: // Top Priority
-        stepInstructions = `(4/7) Of those issues, which ONE matters most to you right now?`;
-        nextStep = 4;
+      case 4: // Top Priority
+        stepInstructions = `(5/9) Of those issues, which ONE matters most to you right now?`; // Updated step number
+        nextStep = 5; // Updated next step
         break;
 
-      case 4: // Deal-Breakers
-        stepInstructions = `(5/7) Is there any outcome you absolutely could NOT accept in group decisions? One sentence or type 'none'.`;
-        nextStep = 5;
-        
+      case 5: // Deal-Breakers
+        stepInstructions = `(6/9) Is there any outcome you absolutely could NOT accept in group decisions? One sentence or type 'none'.`; // Updated step number
+        nextStep = 6; // Updated next step
+
         // Mark priority issue in the matrix
         if (message && message.trim()) {
           try {
@@ -618,19 +649,19 @@ export async function conductOnboardingChat(
               where: { id: agentId },
               select: { preferences: true }
             });
-            
+
             const prefsObj = typeof currentAgentData?.preferences === 'object' ?
               currentAgentData?.preferences as Record<string, any> :
               {};
-              
+
             let issuesMatrix = prefsObj.issuesMatrix || [];
             if (issuesMatrix.length > 0) {
               // Reset priorities first
               issuesMatrix = issuesMatrix.map((issue: any) => ({ ...issue, isPriority: false }));
-              
+
               // Try to find the issue based on title, number, or key terms
               const lowerMessage = message.toLowerCase();
-              
+
               // Try direct mention of issue number
               const numberMatch = lowerMessage.match(/\b(?:issue)\s*#?(\d+)\b/i);
               if (numberMatch && numberMatch[1]) {
@@ -644,7 +675,7 @@ export async function conductOnboardingChat(
                 const priorityIssue = issuesMatrix.find((issue: any) => {
                   return issue.title && lowerMessage.includes(issue.title.toLowerCase());
                 });
-                
+
                 if (priorityIssue) {
                   const issueIndex = issuesMatrix.findIndex((i: any) => i.id === priorityIssue.id);
                   if (issueIndex >= 0) {
@@ -657,7 +688,7 @@ export async function conductOnboardingChat(
                   }
                 }
               }
-              
+
               // Save updated matrix
               await prisma.agent.update({
                 where: { id: agentId },
@@ -668,7 +699,7 @@ export async function conductOnboardingChat(
                   } as Prisma.InputJsonValue
                 }
               });
-              
+
               console.log(`[Onboarding/FSM] Updated priority issue in matrix:`, JSON.stringify(issuesMatrix));
             }
           } catch (err) {
@@ -677,33 +708,25 @@ export async function conductOnboardingChat(
         }
         break;
 
-      case 5: // Notify Pref (previously step 6)
-        stepInstructions = `(6/7) How often should I brief you? A-major items only B-weekly digest C-every decision.`;
-        nextStep = 6;
+      case 6: // Notify Pref
+        stepInstructions = `(7/9) How often should I brief you? A-major items only B-weekly digest C-every decision.`; // Updated step number
+        nextStep = 7; // Updated next step
         break;
 
-      case 6: // Proposal Seed (previously step 7)
-        stepInstructions = `(7/7) Any idea or proposal you'd like me to log for later? If none, just say 'done'.`;
-        nextStep = 7;
+      case 7: // Proposal Seed
+        stepInstructions = `(8/9) Any idea or proposal you'd like me to log for later? If none, just say 'done'.`; // Updated step number
+        nextStep = 8; // Updated next step
         break;
 
-      case 7: // Summary & Finish (previously step 8)
+      case 8: // Summary & Finish
         // Extract JSON from conversation
         preferences = await extractPreferencesFromConversation(context);
-        
-        // Format a nice JSON summary
-        const summaryJSON = JSON.stringify(preferences, null, 2);
-        
-        stepInstructions = `Great! Here's a summary of what I learned:
 
-        \`\`\`json
-        ${summaryJSON}
-        \`\`\`
-        
-        All set! Ask me anything or explore proposals whenever you're ready.`;
-        
+        // Remove the JSON summary from the agent's final response
+        stepInstructions = `All set! Ask me anything or explore proposals whenever you're ready.`;
+
         completedOnboarding = true;
-        
+
         // Update agent preferences with extracted data
         await updateAgentPreferences(agentId, preferences);
         break;
@@ -753,8 +776,30 @@ export async function conductOnboardingChat(
         // Log the full prompt array for diagnosis
         console.log('[Onboarding/FSM] Full prompt array:', JSON.stringify(messagesForLlm, null, 2));
         const { content } = await callLLM(messagesForLlm, DEFAULT_MODEL, { agentId });
-        agentResponseContent = content;
-        console.log('[Onboarding/FSM] LLM response received:', content.substring(0, 200));
+        
+        // For step 8 (final step), explicitly filter out any JSON from the response
+        if (step === 8 || nextStep > 7) {
+          // Extract only the non-JSON part from the response by looking for typical phrases
+          const standardResponse = "All set! Ask me anything or explore proposals whenever you're ready.";
+          
+          // More robust JSON detection - look for anything that starts with { and includes typical JSON keys
+          const hasJson = /\{[\s\S]*("agentNickname"|"selectedIssues"|"issueStances"|"topPriorityIssue"|"dealBreakers"|"notifyPref")[\s\S]*\}/.test(content);
+          
+          if (hasJson) {
+            console.log('[Onboarding/FSM] JSON detected in final step response, replacing with standard message');
+            agentResponseContent = standardResponse;
+          } else {
+            agentResponseContent = content;
+          }
+          
+          // Force onboarding completion
+          completedOnboarding = true;
+          console.log('[Onboarding/FSM] Final step detected, marking onboarding as completed');
+        } else {
+          agentResponseContent = content;
+        }
+        
+        console.log('[Onboarding/FSM] LLM response received:', agentResponseContent.substring(0, 200));
       } catch (llmError) {
         console.error('[Onboarding/FSM] LLM call failed:', llmError);
         // Fallback to step instruction if LLM fails
@@ -780,7 +825,7 @@ export async function conductOnboardingChat(
     // Make sure we have content before saving agent message
     if (!agentResponseContent) {
       console.log('[Onboarding] No agent response content, using default greeting');
-      agentResponseContent = `(1/7) Welcome! I'm your Praxis Agent. Pick a short name for me when we chat.`;
+      agentResponseContent = `(1/9) Welcome! I'm your Praxis Agent. Pick a short name for me when we chat.`;
     }
 
     // Save agent response
@@ -790,7 +835,8 @@ export async function conductOnboardingChat(
         isOnboarding: true,
         step,
         nextStep,
-        completedOnboarding
+        completedOnboarding,
+        onboardingComplete: completedOnboarding // Add this redundant field for compatibility
       }, agent.name); // Pass the updated agent name
       console.log('[Onboarding] Saved agent message:', {
         id: savedAgentMessage?.id,
@@ -802,12 +848,38 @@ export async function conductOnboardingChat(
       console.error('[Onboarding] Failed to save agent message:', err);
     }
 
-    // Mark onboarding complete in DB
-    if (completedOnboarding) {
-      await prisma.agent.update({
-        where: { id: agentId },
-        data: { onboardingCompleted: true }
-      });
+    // Mark onboarding complete in DB for the final step or if explicitly marked
+    if (completedOnboarding || step === 8 || nextStep >= 8) {
+      console.log('[Onboarding/FSM] Marking onboarding as completed for agentId:', agentId);
+      
+      try {
+        // Use upsert to ensure the agent record exists and is updated
+        await prisma.agent.update({
+          where: { id: agentId },
+          data: {
+            onboardingCompleted: true
+          }
+        });
+        
+        // Double-check that it was set
+        const updatedAgent = await prisma.agent.findUnique({
+          where: { id: agentId },
+          select: { onboardingCompleted: true }
+        });
+        
+        console.log('[Onboarding/FSM] Agent onboardingCompleted status:', updatedAgent?.onboardingCompleted);
+        
+        // If somehow it failed to update, try once more
+        if (!updatedAgent?.onboardingCompleted) {
+          console.log('[Onboarding/FSM] Retrying onboarding completion flag update');
+          await prisma.agent.update({
+            where: { id: agentId },
+            data: { onboardingCompleted: true }
+          });
+        }
+      } catch (err) {
+        console.error('[Onboarding/FSM] Error updating onboardingCompleted flag:', err);
+      }
     }
 
     // Return response with updated metadata for next call
@@ -877,9 +949,9 @@ async function extractPreferencesFromConversation(context: any[]): Promise<any> 
     .map(msg => `${msg.role}: ${msg.content}`)
     .join('\n');
 
-  // Call LLM with extraction prompt
+  // Call LLM with extraction prompt - make it clear this should NOT be part of the conversation
   const { content } = await callLLM([
-    { role: 'system', content: ONBOARDING_PREFERENCE_EXTRACTION_PROMPT },
+    { role: 'system', content: ONBOARDING_PREFERENCE_EXTRACTION_PROMPT + "\nIMPORTANT: This JSON is for internal use only and should NOT be displayed in the chat." },
     { role: 'user', content: conversationText }
   ]);
 
@@ -937,8 +1009,8 @@ async function updateAgentPreferences(agentId: string, preferences: any) {
   }
 }
 
-function generateStep3Instruction() {
-  return `(4/7) Of those issues, which ONE matters most to you right now?`;
+function generateStep4Instruction() {
+  return `(5/9) Of those issues, which ONE matters most to you right now?`;
 }
 
 // Helper function to extract color (moved from case 5)
