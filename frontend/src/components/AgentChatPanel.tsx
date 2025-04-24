@@ -43,10 +43,8 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
             color: data.color || '#007bff'
           });
         } else {
-          console.error('Failed to fetch agent details');
         }
       } catch (error) {
-        console.error('Error fetching agent:', error);
       } finally {
         setLoading(false);
       }

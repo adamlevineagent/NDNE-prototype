@@ -28,7 +28,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
   // Roo Debug: Check agent name in ChatMessage
   // Roo Debug: Check agent name in ChatMessage - Attempt 5
-  console.log('[ChatMessage] Rendering message:', message.id, 'sender:', message.sender, 'metadata:', message.metadata, 'agentName prop:', agentName);
   // Debug color value in detail
 
   return (

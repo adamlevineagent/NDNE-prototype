@@ -21,7 +21,15 @@ router.get("/me", requireAuth, async (req: AuthenticatedRequest, res: Response) 
       console.error(`[AgentMe] Agent not found for userId: ${userId}`);
       return res.status(404).json({ error: "Agent not found for user." });
     }
+    // Add detailed color debugging
+    console.log(`[DEBUG_COLOR] /me endpoint - Agent color value: ${agent.color}`);
     console.log(`[AgentMe] Returning agent for userId: ${userId}, agentId: ${agent.id}`);
+    console.log(`[DEBUG_COLOR] /me endpoint - Full agent object:`, JSON.stringify({
+      id: agent.id,
+      name: agent.name,
+      color: agent.color,
+      onboardingCompleted: agent.onboardingCompleted
+    }));
     res.json(agent);
   } catch (err) {
     console.error("[AgentMe] Error fetching agent:", err);

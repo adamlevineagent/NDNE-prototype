@@ -1,42 +1,71 @@
-# Handoff: Praxis Agent Onboarding Debugging and Implementation
+# NDNE Prototype Handoff Document
 
-## Task
+## Critical Issues - Onboarding Flow
 
-Continue debugging and perfecting the Praxis Agent onboarding experience in the NDNE prototype.
+### Issue 1: Onboarding FSM and LLM Prompt Mismatch
+**(Resolved)** The LLM prompt (`onboarding-prompts.ts`) and backend FSM (`agent-service.ts`) were updated to follow the same 8-step sequence.
 
-## Current Status
+### Issue 2: Agent Name Not Updating
+**(Resolved)** The agent name is now updated immediately after step 0 in `agent-service.ts`.
 
-Significant progress has been made on the onboarding flow:
+### Issue 3: Issues Matrix Never Displaying / Incorrect Data
+**(Partially Resolved - In Progress)**
+- **Problem:** The "Positions Matrix" (formerly Issues Matrix) still displays incorrect data after issue selection. Specifically, after selecting issues (e.g., "1, 5, 6"), the matrix incorrectly shows "Key Points: 1, 5, 6" for the first issue before any stance is provided. It also fails to display the full issue titles and longform perspective summaries.
+- **Root Cause:** The frontend logic (`OnboardingChat.tsx`) was incorrectly using the issue selection string as the "reason" for the first issue. The backend logic (`agent-service.ts`) was also not correctly updating the matrix for the first issue or saving the full title/description/summary.
+- **Current Status:**
+    - Backend (`agent-service.ts`) updated to:
+        - Save `title`, `description`, `stance`, `reason`, and `summary` (mapped perspective) for each issue in `issuesMatrix`.
+        - Only update the matrix after a valid stance is provided (not for the selection string).
+        - Log the `issuesMatrix` state after updates for debugging.
+    - Frontend (`IssuesMatrix.tsx`) updated to:
+        - Display `title`, `description`, `stance` badge, and `summary`/`reason`.
+        - Only show "Perspective" section if `summary` or valid `reason` exists.
+    - Frontend (`OnboardingChat.tsx`) updated to:
+        - Rely solely on `extractedPreferences.issuesMatrix` from the backend for matrix state.
+        - Removed local `updateIssueMatrix` logic.
+- **Remaining Issue:** The bug persists where the selection string appears as "Key Points" for the first issue. Further debugging is needed, likely focusing on the exact timing and data flow between the backend FSM state transitions and the frontend state updates.
 
-*   **FSM-based Onboarding:** The backend implements the canonical 8-step FSM flow.
-*   **Scenario Service:** Provides dynamic issues from the database with fallback.
-*   **Onboarding Prompts:** Canonical prompts are in place.
-*   **Proactive Agent Message:** The agent sends a proactive hello only if the chat history is empty.
-*   **No Phantom User Message:** Empty user messages are ignored by the backend.
-*   **JWT Auth:** Frontend fetches include JWT.
-*   **Reset Onboarding:** Functionality to reset onboarding state exists.
-*   **Live Chat Updates (FIXED):** The frontend now optimistically adds the user's message to the chat immediately after sending. The backend response containing the saved user and agent messages is then used to update the chat history, replacing the temporary message and adding the agent's reply.
-*   **Agent's First Message Context (PARTIALLY FIXED):** The initial greeting at step 0 is now handled directly without an LLM call if the user's message is empty.
+### Issue 4: Step Counter Incorrect
+**(New)** The UI shows "Step X of 7" but there are 8 steps (0-7).
+- **Fix:** Updated `OnboardingProgress` in `OnboardingChat.tsx` to show "Step X of 8".
 
-## Resolved Issue
+### Issue 5: User Name Not Collected
+**(New)** The onboarding flow does not ask for the user's actual name.
+- **Plan:** Add a new step 0 to ask for the user's name, update Prisma schema, save name to User model, update prompts, and update step counter to 9 steps (0-8). *(Partially attempted, needs completion)*.
 
-*   **Agent's Response Name:** The issue where the agent's response content used the old default name ("Agent") instead of the new nickname provided at step 0 has been fixed.
+### Issue 6: JSON Output in Chat
+**(New)** The final onboarding step outputs the raw JSON preference summary into the chat window.
+- **Plan:** Remove the JSON summary from the final step's `agentResponseContent` in `agent-service.ts`.
 
-## Technical Details of Resolved Issue
+### Issue 7: No Redirect After Onboarding
+**(New)** Completing onboarding no longer redirects the user to the dashboard.
+- **Plan:** Investigate `handleSendMessage` and `handleOnboardingComplete` in `OnboardingChat.tsx` to ensure `navigate('/dashboard')` is called correctly when `completedOnboarding` is true.
 
-The `conductOnboardingChat` function in `backend/src/services/agent-service.ts` was modified to update the agent's name in the database immediately after processing the user's message at step 0. Additionally, the `saveMessage` function in `backend/src/services/chat-service.ts` was updated to accept and use the current agent name when saving agent messages, ensuring the correct name is included in the message metadata sent to the frontend. The frontend's `ChatMessage.tsx` component was updated to prioritize the agent name from message metadata if available.
+## Resetting Onboarding State
 
-## Files Modified
+If you need to reset the onboarding process for a user to test changes:
 
-*   `frontend/src/components/OnboardingChat.tsx`: Implemented optimistic UI update for user messages and updated agent state after fetching agent info.
-*   `frontend/src/components/chat/ChatInterface.tsx`: Added `newMessages` prop to append messages and removed `reloadKey` dependency for initial fetch. Exported `ChatMessage` interface.
-*   `backend/src/services/agent-service.ts`: Exported `callLLM`, imported `extractPreferences`, declared `extractedPreferences` at the correct scope, called `extractPreferences` in case 8, removed local extraction function, and included `extractedPreferences` in the return object. Added logic to handle initial empty message at step 0 without LLM call.
-*   `backend/src/services/preference-extractor.ts`: Modified `extractPreferences` to accept messages with `role` instead of `sender`.
-*   `backend/src/services/chat-service.ts`: Reviewed and confirmed `getConversationContext` returns messages with `role`.
-*   `backend/src/routes/onboarding.ts`: Confirmed usage of `conductOnboardingChat` for onboarding messages.
+1.  **Identify User and Agent:** You need the `userId` and `agentId` for the user you want to reset. You can often find these in application logs or by inspecting network requests in your browser's developer tools during login or onboarding.
+2.  **Use the Reset Endpoint:** Send a POST request to the `/api/onboarding/reset` endpoint. You can use tools like `curl`, Postman, or Insomnia.
 
-## Next Steps
+    **Example using `curl`:**
+    ```bash
+    # Replace YOUR_JWT_TOKEN, YOUR_USER_ID, and YOUR_AGENT_ID with actual values
+    curl -X POST \
+      http://localhost:3001/api/onboarding/reset \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+      -d '{
+            "agentId": "YOUR_AGENT_ID"
+          }'
+    ```
+    *(Note: Ensure the backend server is running, typically on port 3001)*
 
-1.  **Continue Onboarding Implementation:** Proceed with implementing the remaining steps of the 8-step FSM in `conductOnboardingChat` and the corresponding frontend updates in `OnboardingChat.tsx`.
-2.  **Implement Preference Extraction Logic:** Refine the `extractPreferences` function in `backend/src/services/preference-extractor.ts` to accurately parse the required preferences from the conversation history based on the FSM steps.
-3.  **Testing:** Add comprehensive unit and E2E tests for the completed and remaining parts of the onboarding flow as outlined in `core-test-implementation-plan.md`.
+3.  **Verification:** The endpoint should return a success message. This action will:
+    *   Reset the agent's `name`, `color`, and `preferences` to defaults.
+    *   Set `onboardingCompleted` to `false`.
+    *   Delete all onboarding-related chat messages for that user/agent.
+4.  **Refresh Frontend:** Refresh the onboarding page (`/onboarding`) in the browser. The process should start again from step 0.
+
+---
+*This document reflects the state as of 2025-04-23 10:45 PM PT.*

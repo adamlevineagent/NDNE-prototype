@@ -58,19 +58,16 @@ const OnboardingWizard: React.FC = () => {
 
         try {
             // Use the API client to make the actual API call
-            console.log(`Calling API: /api/onboarding/steps/${apiStep}`, stepData);
             await onboarding.saveStep(step, stepData);
 
             if (step < totalSteps) {
                 setStep(prev => prev + 1);
             } else {
                 // Onboarding complete - redirect to dashboard
-                console.log('Onboarding complete!');
                 navigate('/dashboard');
             }
         } catch (err: any) {
             setError(err.message || 'An error occurred.');
-            console.error("Onboarding step failed:", err);
         } finally {
             setIsLoading(false);
         }

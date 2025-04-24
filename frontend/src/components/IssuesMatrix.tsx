@@ -4,8 +4,10 @@ import './IssuesMatrix.css';
 export interface Issue {
   id: string;
   title: string;
+  description: string;
   stance?: string | null;
   reason?: string | string[];
+  summary?: string | null;
   isPriority?: boolean;
 }
 
@@ -96,17 +98,36 @@ const IssuesMatrix: React.FC<IssuesMatrixProps> = ({
                       </span>
                     )}
                   </div>
-                  {issue.reason && (
+                  {issue.description && (
+                    <div className="issue-description">
+                      <span className="description-label">Description:</span>
+                      <span className="description-text">{issue.description}</span>
+                    </div>
+                  )}
+                  {(issue.summary ||
+                    (issue.reason &&
+                      typeof issue.reason === 'string' &&
+                      issue.reason !== null &&
+                      !/^\d+(,\s*\d+)*$/.test(issue.reason.trim())
+                    )
+                  ) && (
                     <div className="issue-reason">
-                      <span className="reason-label">Key Points:</span>
-                      {Array.isArray(issue.reason) ? (
-                        <ul className="reason-bullets">
-                          {issue.reason.map((point, idx) => (
-                            <li key={idx}>{point}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span className="reason-text">{issue.reason}</span>
+                      <span className="reason-label">Perspective:</span>
+                      {issue.summary && (
+                        <div className="summary-text">
+                          {issue.summary}
+                        </div>
+                      )}
+                      {issue.reason && issue.reason !== issue.summary && (
+                        Array.isArray(issue.reason) ? (
+                          <ul className="reason-bullets">
+                            {issue.reason.map((point, idx) => (
+                              <li key={idx}>{point}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="reason-text">{issue.reason}</span>
+                        )
                       )}
                     </div>
                   )}

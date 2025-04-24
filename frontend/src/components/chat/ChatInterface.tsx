@@ -51,18 +51,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   // Log whenever props change
   React.useEffect(() => {
-    console.log('[ChatInterface] Props changed:', {
-      agentId,
-      isOnboarding,
-      onboardingStep,
-      onboardingMetadata,
-      onSendMessage: !!onSendMessage,
-      newMessages: newMessages ? newMessages.length : 0, // Log newMessages length
-      agentName, // Log agentName
-      agentColor // Log agentColor
-    });
-    // Add detailed color debugging
-  }, [agentId, isOnboarding, onboardingStep, onboardingMetadata, onSendMessage, newMessages, agentName, agentColor]); // Add agentName and agentColor to dependency array
+    // Removed debug log
+  }, [agentId, isOnboarding, onboardingStep, onboardingMetadata, onSendMessage, newMessages, agentName, agentColor]);
 
   // Load initial messages
   useEffect(() => {
@@ -74,7 +64,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         // Agent details are now passed via props, no need to fetch here
         // if (!agentName || !agentColor) {
         //   // Optionally handle case where agent info is not yet available
-        //   console.warn('[ChatInterface] Agent name or color not available yet.');
         // }
 
         // Get chat messages
@@ -86,9 +75,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         const data = await messagesResponse.json();
         setMessages(data.messages || []);
         setHasMore(false); // Pagination not implemented for custom endpoint
-        console.log('[ChatInterface] Loaded messages:', data.messages);
       } catch (err: any) {
-        console.error('Failed to load messages:', err);
         setError('Failed to load messages. Please try again later.');
       } finally {
         setLoading(false);
@@ -144,7 +131,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       setHasMore(data.hasMore || false);
     } catch (err) {
-      console.error('Failed to load more messages:', err);
       setError('Failed to load more messages. Please try again later.');
     } finally {
       setLoading(false);
@@ -183,7 +169,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       setMessages(prevMessages => {
         const updated = [...prevMessages, tempUserMessage];
-        console.log('[ChatInterface] setMessages after user send (legacy):', updated);
         return updated;
       });
 
@@ -251,7 +236,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         }, 1500);
       }
     } catch (err: any) {
-      console.error('Failed to send message (legacy):', err);
       setError('Failed to send message. Please try again.');
 
       // Remove the temporary message on error and add an error message

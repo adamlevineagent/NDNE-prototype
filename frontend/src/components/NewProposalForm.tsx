@@ -45,7 +45,6 @@ const NewProposalForm: React.FC = () => {
       navigate('/proposals');
     } catch (err) {
       setError('Failed to create proposal.');
-      console.error(err);
     }
   };
 

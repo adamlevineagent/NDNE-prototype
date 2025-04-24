@@ -31,12 +31,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({
 
   // Add debug logging for messages
   useEffect(() => {
-    console.log('[ChatHistory] Messages updated:', {
-      count: messages.length,
-      messageIds: messages.map(m => m.id),
-      firstMessageContent: messages.length > 0 ? messages[0].content.substring(0, 30) + '...' : 'No messages',
-      agentName
-    });
+    // Removed debug log
   }, [messages, agentName]);
 
   // Scroll to bottom when new messages are added (but not when loading more history)
@@ -93,8 +88,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({
       )}
       
       {messages.length === 0 ? (
-        <div className="empty-chat"
-             onLoad={() => console.log('[ChatHistory] Rendering empty state placeholder')}>
+        <div className="empty-chat">
           <div className="loading-spinner"></div>
           <p>Initializing your Praxis Agent...</p>
           <p><small>If no message appears after a few seconds, try refreshing the page.</small></p>
