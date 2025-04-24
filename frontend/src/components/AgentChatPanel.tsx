@@ -7,13 +7,15 @@ interface AgentChatPanelProps {
   minimized?: boolean;
   onMinimize?: () => void;
   onMaximize?: () => void;
+  contextualHelp?: 'positions' | 'activity' | 'proposals';
 }
 
 const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
   agentId,
   minimized = false,
   onMinimize,
-  onMaximize
+  onMaximize,
+  contextualHelp
 }) => {
   const [agent, setAgent] = useState<{
     name: string;
@@ -106,6 +108,15 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
         </button>
       </div>
       <div className="chat-panel-body">
+        {contextualHelp && (
+          <div className="contextual-help-banner" style={{ backgroundColor: agent?.color ? `${agent.color}22` : '#007bff22' }}>
+            <p>
+              {contextualHelp === 'positions' && 'Need help with your positions matrix? Ask me about any issue or how to update your stance.'}
+              {contextualHelp === 'activity' && 'Questions about your agent activity? I can explain any action or help you understand what happened.'}
+              {contextualHelp === 'proposals' && 'Want assistance with proposals? I can help you create, edit, or review your proposals.'}
+            </p>
+          </div>
+        )}
         <ChatInterface agentId={agentId} />
       </div>
     </div>
@@ -113,3 +124,19 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
 };
 
 export default AgentChatPanel;
+
+// Add CSS for the contextual help banner
+const style = document.createElement('style');
+style.textContent = `
+  .contextual-help-banner {
+    padding: 10px 15px;
+    margin: 0 0 15px 0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+  
+  .contextual-help-banner p {
+    margin: 0;
+  }
+`;
+document.head.appendChild(style);
