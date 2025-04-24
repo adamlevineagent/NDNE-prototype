@@ -61,6 +61,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       agentName, // Log agentName
       agentColor // Log agentColor
     });
+    // Add detailed color debugging
   }, [agentId, isOnboarding, onboardingStep, onboardingMetadata, onSendMessage, newMessages, agentName, agentColor]); // Add agentName and agentColor to dependency array
 
   // Load initial messages
@@ -99,14 +100,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   // Effect to append new messages when the newMessages prop changes
   useEffect(() => {
-    // Roo Debug: Log newMessages and agentName when newMessages changes - Attempt 3
+    // Roo Debug: Log newMessages and agentName when newMessages changes - Attempt 5
     console.log('[ChatInterface] useEffect [newMessages] triggered. newMessages:', newMessages, 'agentName:', agentName);
     if (newMessages && newMessages.length > 0) {
       setMessages(prevMessages => {
+        console.log('[ChatInterface] Before appending newMessages:', prevMessages.map(msg => msg.id)); // Log keys before update
         // Filter out any temporary messages before appending
         const filteredMessages = prevMessages.filter(msg => !msg.id.startsWith('temp-'));
-        const updatedMessages = [...filteredMessages, ...newMessages];
-        console.log('[ChatInterface] Appending new messages:', newMessages, 'Updated messages:', updatedMessages);
+        
+        // Create a map of existing message IDs for quick lookup
+        const existingMessageIds = new Set(filteredMessages.map(msg => msg.id));
+
+        // Filter out new messages that are already in the existing list
+        const uniqueNewMessages = newMessages.filter(msg => !existingMessageIds.has(msg.id));
+
+        const updatedMessages = [...filteredMessages, ...uniqueNewMessages];
+        console.log('[ChatInterface] Appending new messages:', uniqueNewMessages.map(msg => msg.id), 'Updated messages:', updatedMessages.map(msg => msg.id)); // Log keys after update
         return updatedMessages;
       });
     }
@@ -209,16 +218,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       const data = response.data;
 
-      // Replace temporary message with actual one and add agent response
+      // Update messages state: replace temporary message and add agent response
       setMessages(prevMessages => {
-        const filteredMessages = prevMessages.filter(msg => !msg.id.startsWith('temp-'));
-        const updated = [
-          ...filteredMessages,
-          data.userMessage,
-          data.agentMessage
-        ];
-        console.log('[ChatInterface] setMessages after API response (legacy):', updated);
-        return updated;
+        console.log('[ChatInterface] Before API response update (legacy):', prevMessages.map(msg => msg.id)); // Log keys before update
+        // Find and replace the temporary user message with the actual saved user message
+        const updatedMessages = prevMessages.map(msg =>
+          msg.id.startsWith('temp-') && msg.content === data.userMessage.content && msg.sender === 'user'
+            ? data.userMessage
+            : msg
+        );
+
+        // Check if the agent message is already in the list (can happen with initial load + real-time updates)
+        const agentMessageExists = updatedMessages.some(msg => msg.id === data.agentMessage.id);
+
+        // Append the agent message only if it's not already present
+        if (!agentMessageExists) {
+          updatedMessages.push(data.agentMessage);
+        }
+        console.log('[ChatInterface] After API response update (legacy):', updatedMessages.map(msg => msg.id)); // Log keys after update
+        return updatedMessages;
       });
 
       // Check if onboarding is completed from agent response metadata

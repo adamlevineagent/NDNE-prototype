@@ -29,6 +29,16 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const prevMessagesLength = useRef<number>(0);
 
+  // Add debug logging for messages
+  useEffect(() => {
+    console.log('[ChatHistory] Messages updated:', {
+      count: messages.length,
+      messageIds: messages.map(m => m.id),
+      firstMessageContent: messages.length > 0 ? messages[0].content.substring(0, 30) + '...' : 'No messages',
+      agentName
+    });
+  }, [messages, agentName]);
+
   // Scroll to bottom when new messages are added (but not when loading more history)
   useEffect(() => {
     if (messages.length > prevMessagesLength.current && messagesEndRef.current) {
@@ -83,18 +93,29 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({
       )}
       
       {messages.length === 0 ? (
-        <div className="empty-chat">
-          <p>No messages yet. Start the conversation!</p>
+        <div className="empty-chat"
+             onLoad={() => console.log('[ChatHistory] Rendering empty state placeholder')}>
+          <div className="loading-spinner"></div>
+          <p>Initializing your Praxis Agent...</p>
+          <p><small>If no message appears after a few seconds, try refreshing the page.</small></p>
         </div>
       ) : (
-        messages.map((message) => (
-          <ChatMessage
-            key={message.id}
-            message={message}
-            agentColor={agentColor}
-            agentName={agentName}
-          />
-        ))
+        <>
+          {/* Add debug overlay for development */}
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="debug-info" style={{ fontSize: '10px', color: '#666', padding: '4px', background: '#f9f9f9' }}>
+              Messages: {messages.length} | Agent: {agentName}
+            </div>
+          )}
+          {messages.map((message) => (
+            <ChatMessage
+              key={message.id}
+              message={message}
+              agentColor={agentColor}
+              agentName={agentName}
+            />
+          ))}
+        </>
       )}
       
       {/* Invisible element to scroll to when new messages arrive */}

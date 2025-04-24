@@ -54,6 +54,30 @@
   min-height: 400px;
 }
 
+/* Issues matrix layout within onboarding flow */
+.issues-matrix {
+  margin: 1rem 0 2rem 0;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.issues-matrix:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Responsive layout for the issues matrix in onboarding */
+@media (max-width: 768px) {
+  .issues-matrix .issues-list {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .issues-matrix-heading {
+    font-size: 1rem;
+  }
+}
+
 .onboarding-footer {
   font-size: 0.9rem;
   color: #718096;

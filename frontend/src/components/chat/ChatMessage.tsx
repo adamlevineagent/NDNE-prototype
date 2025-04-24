@@ -29,6 +29,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   // Roo Debug: Check agent name in ChatMessage
   // Roo Debug: Check agent name in ChatMessage - Attempt 5
   console.log('[ChatMessage] Rendering message:', message.id, 'sender:', message.sender, 'metadata:', message.metadata, 'agentName prop:', agentName);
+  // Debug color value in detail
 
   return (
     <div className={`chat-message ${isAgent ? 'agent-message' : 'user-message'}`}>
@@ -37,6 +38,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         style={{
           backgroundColor: isAgent ? `${agentColor}22` : undefined,
           borderLeftColor: isAgent ? agentColor : undefined
+        }}
+        onClick={() => {
+          // Log the applied styles when clicked for debugging
         }}
       >
         <div className="message-header">

@@ -1,0 +1,257 @@
+.issues-matrix-container {
+  margin: 1rem 0;
+  position: relative;
+}
+
+.issues-matrix {
+  margin: 0;
+  padding: 1rem;
+  background-color: #f7fafc;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  max-width: 100%;
+  min-height: 150px;
+}
+
+.issues-matrix-heading {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #2d3748;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.5rem;
+}
+
+.issues-matrix-content {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.issues-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.issue-item {
+  padding: 0.75rem;
+  background-color: white;
+  border-radius: 0.375rem;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.issue-item:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.priority-issue {
+  border-width: 2px;
+  border-style: solid;
+  position: relative;
+}
+
+.issue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.issue-title {
+  font-weight: 500;
+  line-height: 1.2;
+  color: #1a202c;
+}
+
+.issue-stance {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  color: white;
+  text-transform: uppercase;
+}
+
+.stance-support {
+  background-color: #48BB78;
+}
+
+.stance-oppose {
+  background-color: #F56565;
+}
+
+.stance-depends {
+  background-color: #F6AD55;
+}
+
+.issue-reason {
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  color: #4a5568;
+  line-height: 1.4;
+}
+
+.reason-label {
+  font-weight: 500;
+  color: #2d3748;
+}
+
+.priority-badge {
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: white;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.issues-matrix-empty {
+  font-style: italic;
+  color: #a0aec0;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.issues-matrix-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.issues-matrix-empty-placeholder {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.empty-placeholder-card {
+  width: 250px;
+  height: 100px;
+  background-color: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  opacity: 0.6;
+  border-width: 1px;
+  border-style: dashed;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+  100% { opacity: 0.4; }
+}
+
+.empty-placeholder-header {
+  height: 20px;
+  background-color: #edf2f7;
+  border-radius: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.empty-placeholder-body {
+  height: 40px;
+  background-color: #edf2f7;
+  border-radius: 0.25rem;
+}
+
+.issues-matrix-footer {
+  margin-top: 1rem;
+  font-style: italic;
+  color: #718096;
+  text-align: center;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.5rem;
+}
+
+/* Add transition animation for matrix items */
+.issue-item {
+  animation: fadeIn 0.3s ease-in-out;
+  transition: all 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animation for highlighting updated issues */
+@keyframes highlight {
+  0% { background-color: rgba(99, 102, 241, 0.2); }
+  100% { background-color: white; }
+}
+
+.issue-item.updated {
+  animation: highlight 2s ease-out;
+}
+
+/* Style entering the steps */
+.issues-matrix[data-step="1"] {
+  border-left: 2px solid #4299E1;
+}
+
+.issues-matrix[data-step="2"] {
+  border-left: 2px solid #48BB78;
+}
+
+.issues-matrix[data-step="3"], .issues-matrix[data-step="4"] {
+  border-left: 2px solid #F6AD55;
+}
+
+.issues-matrix[data-step="5"], .issues-matrix[data-step="6"], .issues-matrix[data-step="7"] {
+  border-left: 2px solid #9F7AEA;
+}
+
+@media (max-width: 640px) {
+  .issues-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Debug info for matrix */
+.matrix-debug-info {
+  background-color: #f8f9fa;
+  border: 1px dashed #cbd5e0;
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #718096;
+  text-align: center;
+}
+
+.debug-button {
+  background-color: #edf2f7;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: #4a5568;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.debug-button:hover {
+  background-color: #e2e8f0;
+}
