@@ -24,6 +24,11 @@ apiClient.interceptors.response.use(
     // Handle network errors
     if (!error.response) {
       console.error('Network Error:', error.message);
+      console.error('Request details:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: error.config?.headers,
+      });
       return Promise.reject({
         status: 'error',
         message: 'Network error. Please check your connection and try again.',
@@ -33,6 +38,13 @@ apiClient.interceptors.response.use(
 
     // Handle API errors
     const { status, data } = error.response;
+    
+    console.error('API Error Response:', {
+      status,
+      data,
+      url: error.config?.url,
+      method: error.config?.method
+    });
     
     let errorMessage = 'An unexpected error occurred';
     
@@ -44,6 +56,7 @@ apiClient.interceptors.response.use(
     
     // Handle auth errors
     if (status === 401) {
+      console.log('Authentication error detected, clearing token');
       // Clear token if unauthorized
       localStorage.removeItem('token');
       
@@ -64,14 +77,74 @@ apiClient.interceptors.response.use(
 
 // API endpoints
 export const auth = {
-  register: (data: { email: string; password: string }) => 
-    apiClient.post('/auth/register', data),
+  register: (data: { email: string; password: string }) => {
+    console.log('[DEBUG-API-FIX] Sending registration request:', { email: data.email });
+    return apiClient.post('/auth/register', data)
+      .then(response => {
+        console.log('[DEBUG-API-FIX] Registration successful:', response.data ? {
+          tokenReceived: !!response.data.token,
+          tokenLength: response.data.token ? response.data.token.length : 0,
+          tokenStart: response.data.token ? `${response.data.token.substring(0, 15)}...` : 'null'
+        } : 'No data');
+        return response;
+      })
+      .catch(error => {
+        console.error('[DEBUG-API-FIX] Registration failed:', error);
+        // Log more detailed error information
+        if (error.originalError?.response) {
+          console.error('[DEBUG-API-FIX] Server response:', {
+            status: error.originalError.response.status,
+            data: error.originalError.response.data
+          });
+        } else {
+          console.error('[DEBUG-API-FIX] Error details:', JSON.stringify(error));
+        }
+        throw error;
+      });
+  },
   
-  login: (data: { email: string; password: string }) => 
-    apiClient.post('/auth/login', data),
+  login: (data: { email: string; password: string }) => {
+    console.log('[DEBUG-API-FIX] Sending login request:', { email: data.email });
+    return apiClient.post('/auth/login', data)
+      .then(response => {
+        console.log('[DEBUG-API-FIX] Login successful, token received:', !!response.data.token);
+        return response;
+      })
+      .catch(error => {
+        console.error('[DEBUG-API-FIX] Login failed:', error);
+        if (error.originalError?.response) {
+          console.error('[DEBUG-API-FIX] Server response:', {
+            status: error.originalError.response.status,
+            data: error.originalError.response.data
+          });
+        }
+        throw error;
+      });
+  },
   
-  getUser: () =>
-    apiClient.get('/auth/me'),
+  getUser: () => {
+    const token = localStorage.getItem('token');
+    console.log('[DEBUG-API-FIX] Fetching user data with token:', token ? `${token.substring(0, 15)}...` : 'none');
+    return apiClient.get('/auth/me')
+      .then(response => {
+        console.log('[DEBUG-API-FIX] User data retrieved successfully:', response.data ? {
+          id: response.data.id,
+          email: response.data.email,
+          agentExists: !!response.data.agent
+        } : 'No data');
+        return response;
+      })
+      .catch(error => {
+        console.error('[DEBUG-API-FIX] Failed to fetch user data:', error);
+        if (error.originalError?.response) {
+          console.error('[DEBUG-API-FIX] Server response:', {
+            status: error.originalError.response.status,
+            data: error.originalError.response.data
+          });
+        }
+        throw error;
+      });
+  },
 };
 
 export const agents = {

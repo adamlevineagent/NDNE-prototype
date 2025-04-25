@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import IssuesMatrix, { Issue } from '../IssuesMatrix';
 
+import { useDashboard } from '../../context/DashboardContext';
+
+import { useChatContext } from '../../hooks/useChatContext';
+
 interface PositionsMatrixTabProps {
-  issues: Issue[];
   welcomeMessage: string;
   agentColor: string;
+  onChatMaximize: () => void;
 }
 
 /**
@@ -12,10 +16,13 @@ interface PositionsMatrixTabProps {
  * This is an enhanced version of the IssuesMatrix component with filtering capabilities
  */
 const PositionsMatrixTab: React.FC<PositionsMatrixTabProps> = ({
-  issues,
   welcomeMessage,
-  agentColor
+  agentColor,
+  onChatMaximize
 }) => {
+  const { issues } = useDashboard();
+  const { setChatContext } = useChatContext();
+
   // State for filter controls
   const [showAllIssues, setShowAllIssues] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'priority'>('priority');
@@ -41,6 +48,15 @@ const PositionsMatrixTab: React.FC<PositionsMatrixTabProps> = ({
       return a.title.localeCompare(b.title);
     }
   });
+
+  // Handler for "Discuss a New Issue"
+  const handleDiscussNewIssue = () => {
+    setChatContext({
+      type: 'new_issue',
+      data: {}
+    });
+    onChatMaximize();
+  };
 
   return (
     <div className="positions-matrix-tab">
@@ -95,10 +111,17 @@ const PositionsMatrixTab: React.FC<PositionsMatrixTabProps> = ({
         </div>
       ) : (
         <div className="issues-matrix-wrapper">
-          <IssuesMatrix 
+          <IssuesMatrix
             selectedIssues={sortedIssues}
             step={7} // Use step 7 for dashboard view
             agentColor={agentColor}
+            onDiscussIssue={(issueId, title) => {
+              setChatContext({
+                type: 'issue_discussion',
+                data: { issueId, title }
+              });
+              onChatMaximize();
+            }}
           />
         </div>
       )}
@@ -107,7 +130,7 @@ const PositionsMatrixTab: React.FC<PositionsMatrixTabProps> = ({
         <button 
           className="action-button"
           style={{ backgroundColor: agentColor }}
-          onClick={() => console.log("Discuss new issue")}
+          onClick={handleDiscussNewIssue}
         >
           Discuss a New Issue
         </button>

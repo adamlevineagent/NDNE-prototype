@@ -15,16 +15,18 @@ interface IssuesMatrixProps {
   selectedIssues: Issue[];
   step: number;
   agentColor?: string;
+  onDiscussIssue?: (issueId: string, title: string) => void;
 }
 
 /**
  * Component that displays a visual matrix of user's selected issues and their positions
  * Updates dynamically during the onboarding steps 1-4
  */
-const IssuesMatrix: React.FC<IssuesMatrixProps> = ({ 
-  selectedIssues, 
+const IssuesMatrix: React.FC<IssuesMatrixProps> = ({
+  selectedIssues,
   step,
-  agentColor = '#4299E1' 
+  agentColor = '#4299E1',
+  onDiscussIssue
 }) => {
   const isVisible = useMemo(() => {
     // Show after step 1 even if no issues are selected yet
@@ -134,6 +136,17 @@ const IssuesMatrix: React.FC<IssuesMatrixProps> = ({
                   {issue.isPriority && (
                     <div className="priority-badge" style={{ backgroundColor: agentColor }}>
                       Top Priority
+                    </div>
+                  )}
+                  {onDiscussIssue && (
+                    <div className="issue-discuss-action">
+                      <button
+                        className="discuss-issue-button"
+                        style={{ backgroundColor: agentColor, color: '#fff', marginTop: '0.5rem' }}
+                        onClick={() => onDiscussIssue(issue.id, issue.title)}
+                      >
+                        Discuss
+                      </button>
                     </div>
                   )}
                 </li>

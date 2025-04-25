@@ -850,36 +850,61 @@ export async function conductOnboardingChat(
 
     // Mark onboarding complete in DB for the final step or if explicitly marked
     if (completedOnboarding || step === 8 || nextStep >= 8) {
-      console.log('[Onboarding/FSM] Marking onboarding as completed for agentId:', agentId);
+      console.log('[DEBUG-COMPLETION] Marking onboarding as completed for agentId:', agentId,
+                 'completedOnboarding flag:', completedOnboarding,
+                 'step:', step,
+                 'nextStep:', nextStep);
       
       try {
-        // Use upsert to ensure the agent record exists and is updated
-        await prisma.agent.update({
+        console.log('[DEBUG-COMPLETION] Before update - agent state:', await prisma.agent.findUnique({
+          where: { id: agentId },
+          select: { id: true, name: true, onboardingCompleted: true }
+        }));
+        
+        // Use update to ensure the agent record is updated
+        const updateResult = await prisma.agent.update({
           where: { id: agentId },
           data: {
             onboardingCompleted: true
           }
         });
         
+        console.log('[DEBUG-COMPLETION] Update operation result:', {
+          id: updateResult.id,
+          onboardingCompleted: updateResult.onboardingCompleted
+        });
+        
         // Double-check that it was set
         const updatedAgent = await prisma.agent.findUnique({
           where: { id: agentId },
-          select: { onboardingCompleted: true }
+          select: { id: true, name: true, onboardingCompleted: true }
         });
         
-        console.log('[Onboarding/FSM] Agent onboardingCompleted status:', updatedAgent?.onboardingCompleted);
+        console.log('[DEBUG-COMPLETION] After update - Verified agent state:', updatedAgent);
         
         // If somehow it failed to update, try once more
         if (!updatedAgent?.onboardingCompleted) {
-          console.log('[Onboarding/FSM] Retrying onboarding completion flag update');
-          await prisma.agent.update({
+          console.log('[DEBUG-COMPLETION] Onboarding flag not set! Retrying update...');
+          const secondAttempt = await prisma.agent.update({
             where: { id: agentId },
             data: { onboardingCompleted: true }
           });
+          console.log('[DEBUG-COMPLETION] Second update attempt result:', {
+            id: secondAttempt.id,
+            onboardingCompleted: secondAttempt.onboardingCompleted
+          });
         }
       } catch (err) {
-        console.error('[Onboarding/FSM] Error updating onboardingCompleted flag:', err);
+        console.error('[DEBUG-COMPLETION] Error updating onboardingCompleted flag:', err);
+        // Dump the full error for diagnosis
+        console.error('[DEBUG-COMPLETION] Full error:', JSON.stringify(err, null, 2));
       }
+    } else {
+      console.log('[DEBUG-COMPLETION] Not marking onboarding complete:', {
+        completedOnboarding,
+        step,
+        nextStep
+      });
     }
 
     // Return response with updated metadata for next call

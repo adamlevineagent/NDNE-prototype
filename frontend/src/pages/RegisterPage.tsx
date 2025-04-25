@@ -40,13 +40,59 @@ const RegisterPage: React.FC = () => {
         password: formData.password,
       });
 
-      // Use the login function from context
-      login(response.data.token);
+      // Flag that this is a new registration
+      localStorage.setItem('just_registered', 'true');
       
-      // New users should be directed to onboarding
-      navigate('/onboarding');
+      // Get the token and validate it
+      const token = response.data.token;
+      if (!token) {
+        console.error('[DEBUG-CRITICAL] Registration returned success but no token was received');
+        setError('Registration completed but authentication failed. Please try logging in.');
+        return;
+      }
+      
+      // Log registration success with token details
+      console.log('[DEBUG-CRITICAL] Registration successful, token info:', {
+        tokenPrefix: token.substring(0, 15) + '...',
+        tokenLength: token.length
+      });
+      
+      // Use the login function from context and handle errors
+      try {
+        console.log('[DEBUG-CRITICAL] Calling login with token...');
+        login(token);
+        
+        // Add a longer delay to ensure login processing & token validation completes
+        console.log('[DEBUG-CRITICAL] Will navigate to onboarding in 1000ms...');
+        setTimeout(() => {
+          // Double check token is still in localStorage before navigating
+          const storedToken = localStorage.getItem('token');
+          if (!storedToken) {
+            console.error('[DEBUG-CRITICAL] Token missing from localStorage before navigation');
+            setError('Authentication issue occurred. Please try logging in manually.');
+            return;
+          }
+          
+          console.log('[DEBUG-CRITICAL] Token verified, navigating to /onboarding now');
+          // New users should be directed to onboarding
+          navigate('/onboarding');
+          
+          // As a fallback, if navigation fails, force a hard redirect
+          setTimeout(() => {
+            console.log('[DEBUG-CRITICAL] Fallback navigation check triggered');
+            if (window.location.pathname !== '/onboarding') {
+              console.log('[DEBUG-CRITICAL] Forcing hard navigation to /onboarding');
+              window.location.href = '/onboarding';
+            }
+          }, 500);
+        }, 1000);
+      } catch (loginErr) {
+        console.error('[DEBUG-CRITICAL] Error during login process:', loginErr);
+        setError('Failed to complete authentication. Please try logging in manually.');
+      }
     } catch (err: any) {
-      console.error('Registration error:', err);
+      console.error('[DEBUG-REG-FIX] Registration error:', err);
+      console.error('[DEBUG-REG-FIX] Error details:', JSON.stringify(err));
       setError(err.message || 'Failed to register. Please check your connection and try again.');
     } finally {
       setLoading(false);

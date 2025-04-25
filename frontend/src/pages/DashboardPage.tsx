@@ -5,14 +5,13 @@ import AgentChatPanel from '../components/AgentChatPanel';
 import { useNavigate } from 'react-router-dom';
 
 // Tab content components
-// These components already exist in the project, no need to change the paths
 import PositionsMatrixTab from '../components/dashboard/PositionsMatrixTab';
 import ActivityAuditTab from '../components/dashboard/ActivityAuditTab';
 import ProposalsTab from '../components/dashboard/ProposalsTab';
 
-// Custom hook for chat context
+// Custom hooks
 import { useChatContext } from '../hooks/useChatContext';
-
+import { useDashboard } from '../context/DashboardContext';
 // Placeholder types - replace with actual types from Prisma schema if shared
 interface AgentData {
     id: string;
@@ -20,6 +19,7 @@ interface AgentData {
     color: string;
     alignmentScore: number;
     pausedUntil: string | null;
+    userName?: string; // Added for personalized dashboard welcome
     // Add other relevant fields
 }
 
@@ -42,117 +42,83 @@ const DashboardPage: React.FC = () => {
     const navigate = useNavigate();
     const [agentData, setAgentData] = useState<AgentData | null>(null);
     const [recentActions, setRecentActions] = useState<RecentAction[]>([]);
-    const [issues, setIssues] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [isPausing, setIsPausing] = useState(false);
     const [isVetoingAction, setIsVetoingAction] = useState(false);
     const [vetoingActionId, setVetoingActionId] = useState<string | null>(null);
     const [vetoFeedbackMessage, setVetoFeedbackMessage] = useState<{message: string, isError: boolean} | null>(null);
-    
-    // Tab navigation state
-    const [activeTab, setActiveTab] = useState<TabType>('positions');
-    
+
+    // Dashboard context
+    const { currentTab, setCurrentTab, issues, isLoading, error, refreshData } = useDashboard();
+
     // Chat panel state
     const [isChatMinimized, setIsChatMinimized] = useState(true);
-    
+
     // Chat context for sharing context between tabs and chat panel
     const { setChatContext } = useChatContext();
 
-    const fetchData = async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            // Fetch data for all tabs at once
-            console.log('Fetching dashboard data...');
-            
-            // 1. Fetch agent data (/api/agents/me)
+    // Fetch agent data and recent actions on mount
+    useEffect(() => {
+        // Fetch agent data
+        const fetchAgent = async () => {
             try {
-                // This would be an actual API call in production
                 const response = await fetch('/api/agents/me', {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
                 });
-                
                 if (response.ok) {
                     const data = await response.json();
+                    console.log("[DEBUG_NAMES] Dashboard received agent data:", {
+                        id: data.id,
+                        name: data.name,           // Original name field
+                        agentName: data.agentName, // Explicit agent name (new field)
+                        userName: data.userName,   // User's name
+                        color: data.color,
+                    });
+                    
+                    // Add debugging to understand name data
+                    console.log('[DEBUG_DASHBOARD] Received data from /api/agents/me:', {
+                        id: data.id,
+                        name: data.name,
+                        agentName: data.agentName,
+                        userName: data.userName,
+                        color: data.color
+                    });
+                    
                     setAgentData({
                         id: data.id || 'agent-123',
-                        name: data.name || 'Test Agent',
+                        // Use explicit agent name field for agent's name
+                        name: data.agentName || data.name || 'Test Agent',
                         color: data.color || '#ff0000',
                         alignmentScore: data.alignmentScore || 0.85,
-                        pausedUntil: data.pausedUntil || null
+                        pausedUntil: data.pausedUntil || null,
+                        // Store the real user name (NOT agent name)
+                        userName: data.userName || 'User'
                     });
                 } else {
-                    // Fallback to placeholder data if API fails
-                    const fetchedAgentData: AgentData = {
-                        id: 'agent-123', name: 'Test Agent', color: '#ff0000', alignmentScore: 0.85, pausedUntil: null
-                    };
-                    setAgentData(fetchedAgentData);
+                    setAgentData({
+                        id: 'agent-123', name: 'Test Agent', color: '#ff0000', alignmentScore: 0.85, pausedUntil: null, userName: 'User'
+                    });
                 }
             } catch (err) {
-                console.error("Error fetching agent data:", err);
-                // Fallback to placeholder data
-                const fetchedAgentData: AgentData = {
-                    id: 'agent-123', name: 'Test Agent', color: '#ff0000', alignmentScore: 0.85, pausedUntil: null
-                };
-                setAgentData(fetchedAgentData);
+                setAgentData({
+                    id: 'agent-123', name: 'Test Agent', color: '#ff0000', alignmentScore: 0.85, pausedUntil: null, userName: 'User'
+                });
             }
-
-            // 2. Fetch recent actions (e.g., last 10 votes/comments for this agent)
-            const fetchedActions: RecentAction[] = [ // Placeholder data
-                { id: 'v1', type: 'vote', proposalTitle: 'Increase Budget', proposalId: 'p1', actionDetails: 'Voted YES (Confidence: 90%)', timestamp: new Date(Date.now() - 3600000).toISOString(), canVeto: true, isOverridden: false },
-                { id: 'c1', type: 'comment', proposalTitle: 'New Policy', proposalId: 'p2', actionDetails: 'Commented: "Looks good."', timestamp: new Date(Date.now() - 7200000).toISOString(), canVeto: false, isOverridden: false },
-                { id: 'v2', type: 'vote', proposalTitle: 'Old Proposal', proposalId: 'p3', actionDetails: 'Voted NO (Confidence: 75%)', timestamp: new Date(Date.now() - 86400000).toISOString(), canVeto: false, isOverridden: true },
-            ];
-            setRecentActions(fetchedActions);
-            
-            // 3. Fetch issues data for positions matrix
-            const fetchedIssues = [
-                { 
-                    id: 'issue-1', 
-                    title: 'Climate Change', 
-                    description: 'Policy approaches to address climate change',
-                    stance: 'APPROACH_A',
-                    reason: 'Supporting renewable energy and carbon reduction strategies', 
-                    isPriority: true 
-                },
-                { 
-                    id: 'issue-2', 
-                    title: 'Healthcare Reform', 
-                    description: 'Approaches to healthcare system improvements',
-                    stance: 'APPROACH_B',
-                    reason: 'Focus on market-based solutions with public safeguards', 
-                    isPriority: false 
-                },
-                { 
-                    id: 'issue-3', 
-                    title: 'Education Funding', 
-                    description: 'Methods to fund and improve educational outcomes',
-                    stance: 'APPROACH_C',
-                    reason: 'Balance of public funding with accountability measures', 
-                    isPriority: true 
-                }
-            ];
-            setIssues(fetchedIssues);
-
-        } catch (err: any) {
-            setError(err.message || 'Failed to load dashboard data.');
-            console.error("Dashboard fetch error:", err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchData();
-    }, []); // Fetch data on component mount
-
+        };
+        fetchAgent();
+        refreshData();
+        // TODO: Fetch recent actions from API
+        setRecentActions([
+            { id: 'v1', type: 'vote', proposalTitle: 'Increase Budget', proposalId: 'p1', actionDetails: 'Voted YES (Confidence: 90%)', timestamp: new Date(Date.now() - 3600000).toISOString(), canVeto: true, isOverridden: false },
+            { id: 'c1', type: 'comment', proposalTitle: 'New Policy', proposalId: 'p2', actionDetails: 'Commented: "Looks good."', timestamp: new Date(Date.now() - 7200000).toISOString(), canVeto: false, isOverridden: false },
+            { id: 'v2', type: 'vote', proposalTitle: 'Old Proposal', proposalId: 'p3', actionDetails: 'Voted NO (Confidence: 75%)', timestamp: new Date(Date.now() - 86400000).toISOString(), canVeto: false, isOverridden: true },
+        ]);
+    }, [refreshData]);
     const handlePauseAgent = async () => {
         if (!agentData) return;
         setIsPausing(true);
-        setError(null);
+        // setError(null); // No longer needed, handled by context
         try {
             // Calculate pause duration (e.g., 24 hours from now)
             const pauseUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -166,7 +132,7 @@ const DashboardPage: React.FC = () => {
             setAgentData(prev => prev ? { ...prev, pausedUntil: pauseUntil } : null);
 
         } catch (err: any) {
-            setError(err.message || 'An error occurred while pausing the agent.');
+            // setError(err.message || 'An error occurred while pausing the agent.'); // Use context error if needed
             console.error("Pause agent error:", err);
         } finally {
             setIsPausing(false);
@@ -248,7 +214,7 @@ const DashboardPage: React.FC = () => {
             
             // Refresh data in the background after a short delay
             setTimeout(() => {
-                fetchData();
+                refreshData();
             }, 2000);
         }
     };
@@ -256,19 +222,25 @@ const DashboardPage: React.FC = () => {
     if (isLoading) return <div>Loading Dashboard...</div>;
     if (error) return <div style={{ color: 'red' }}>Error: {error}</div>;
     if (!agentData) return <div>Agent data not found.</div>;
-
+    
     const isPaused = agentData.pausedUntil && new Date(agentData.pausedUntil) > new Date();
     const alignmentPercentage = (agentData.alignmentScore * 100).toFixed(1);
     
     // Create personalized welcome message with user's name
-    // Extract the first name only for more personalized feel
-    const firstName = agentData.name.split(' ')[0];
-    const welcomeMessage = `Hi ${firstName},`;
+    // userName should contain the human user's name (e.g., "Adam")
+    const userFirstName = (agentData.userName || '').split(' ')[0];
+    console.log("[DEBUG_NAMES] Creating welcome message with:", {
+        agentData_name: agentData.name,       // Should be agent's name (e.g., "Prax")
+        agentData_userName: agentData.userName, // Should be user's name (e.g., "Adam")
+        userFirstName: userFirstName
+    });
+    
+    // Use the actual user's name for the welcome message, not the agent name
+    const welcomeMessage = `Hi ${userFirstName || 'User'},`;
     
     // Handle tab switching with context awareness for chat panel
     const handleTabChange = (tab: TabType) => {
-        setActiveTab(tab);
-        
+        setCurrentTab(tab);
         // Update chat context based on active tab
         switch (tab) {
             case 'positions':
@@ -297,21 +269,21 @@ const DashboardPage: React.FC = () => {
             {/* Tab Navigation */}
             <div className="dashboard-tabs">
                 <button
-                    className={`tab-button ${activeTab === 'positions' ? 'active' : ''}`}
+                    className={`tab-button ${currentTab === 'positions' ? 'active' : ''}`}
                     onClick={() => handleTabChange('positions')}
                     aria-label="Positions Matrix Tab"
                 >
                     Positions Matrix
                 </button>
                 <button
-                    className={`tab-button ${activeTab === 'activity' ? 'active' : ''}`}
+                    className={`tab-button ${currentTab === 'activity' ? 'active' : ''}`}
                     onClick={() => handleTabChange('activity')}
                     aria-label="Activity Audit Tab"
                 >
                     Activity Audit
                 </button>
                 <button
-                    className={`tab-button ${activeTab === 'proposals' ? 'active' : ''}`}
+                    className={`tab-button ${currentTab === 'proposals' ? 'active' : ''}`}
                     onClick={() => handleTabChange('proposals')}
                     aria-label="Proposals Tab"
                 >
@@ -321,17 +293,17 @@ const DashboardPage: React.FC = () => {
             
             {/* Tab Content Area */}
             <div className="dashboard-content">
-                {activeTab === 'positions' && (
-                    <PositionsMatrixTab 
-                        issues={issues} 
-                        welcomeMessage={welcomeMessage} 
+                {currentTab === 'positions' && (
+                    <PositionsMatrixTab
+                        welcomeMessage={welcomeMessage}
                         agentColor={agentData.color}
+                        onChatMaximize={() => setIsChatMinimized(false)}
                     />
                 )}
                 
-                {activeTab === 'activity' && (
-                    <ActivityAuditTab 
-                        recentActions={recentActions} 
+                {currentTab === 'activity' && (
+                    <ActivityAuditTab
+                        recentActions={recentActions}
                         welcomeMessage={welcomeMessage}
                         agentColor={agentData.color}
                         handleVeto={handleVeto}
@@ -341,9 +313,9 @@ const DashboardPage: React.FC = () => {
                     />
                 )}
                 
-                {activeTab === 'proposals' && (
-                    <ProposalsTab 
-                        welcomeMessage={welcomeMessage} 
+                {currentTab === 'proposals' && (
+                    <ProposalsTab
+                        welcomeMessage={welcomeMessage}
                         agentColor={agentData.color}
                     />
                 )}
@@ -379,7 +351,8 @@ const DashboardPage: React.FC = () => {
                     minimized={isChatMinimized}
                     onMinimize={() => setIsChatMinimized(true)}
                     onMaximize={() => setIsChatMinimized(false)}
-                    contextualHelp={activeTab}
+                    contextualHelp={currentTab as "positions" | "activity" | "proposals"}
+                    userName={agentData.userName}
                 />
             )}
             

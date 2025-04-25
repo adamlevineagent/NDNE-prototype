@@ -14,6 +14,7 @@ export interface ChatInterfaceProps {
   newMessages?: ChatMessage[]; // New prop to receive messages to append
   agentName?: string; // Add agentName prop
   agentColor?: string; // Add agentColor prop
+  userName?: string; // Add userName prop
 }
 
 export interface ChatMessage {
@@ -39,7 +40,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onboardingMetadata,
   newMessages, // Receive newMessages prop
   agentName, // Receive agentName prop
-  agentColor // Receive agentColor prop
+  agentColor, // Receive agentColor prop
+  userName // Receive userName prop
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   // Log whenever props change
   React.useEffect(() => {
     // Removed debug log
-  }, [agentId, isOnboarding, onboardingStep, onboardingMetadata, onSendMessage, newMessages, agentName, agentColor]);
+  }, [agentId, isOnboarding, onboardingStep, onboardingMetadata, onSendMessage, newMessages, agentName, agentColor, userName]);
 
   // Load initial messages
   useEffect(() => {
@@ -88,7 +90,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   // Effect to append new messages when the newMessages prop changes
   useEffect(() => {
     // Roo Debug: Log newMessages and agentName when newMessages changes - Attempt 5
-    console.log('[ChatInterface] useEffect [newMessages] triggered. newMessages:', newMessages, 'agentName:', agentName);
+    console.log('[ChatInterface] useEffect [newMessages] triggered. newMessages:', newMessages, 'agentName:', agentName, 'userName:', userName);
     if (newMessages && newMessages.length > 0) {
       setMessages(prevMessages => {
         console.log('[ChatInterface] Before appending newMessages:', prevMessages.map(msg => msg.id)); // Log keys before update
@@ -164,7 +166,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         id: `temp-${Date.now()}`, // Temporary ID
         content,
         sender: 'user',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        metadata: { userName } // Add userName to metadata
       };
 
       setMessages(prevMessages => {
@@ -173,7 +176,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       });
 
       // Create metadata for the API request
-      let requestMetadata: any = { isOnboarding };
+      let requestMetadata: any = { isOnboarding, userName };
 
       // Include current stage information if available from previous messages
       if (isOnboarding && messages.length > 0) {
@@ -280,6 +283,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           loading={loading}
           agentColor={agentColor} // Use prop
           agentName={agentName} // Use prop
+          userName={userName} // Pass userName to ChatHistory
         />
 
         <ChatInput

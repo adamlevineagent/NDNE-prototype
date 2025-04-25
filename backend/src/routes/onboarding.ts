@@ -119,8 +119,18 @@ router.post('/message', requireAuth, async (req: AuthenticatedRequest, res: Resp
   try {
     const { message, step, selectedIssues, issueQueue, currentIssueIndex } = req.body;
     const userId = req.user?.userId;
+    
+    console.log('[DEBUG-ONBOARDING] Message received with:', {
+      userId,
+      message: message?.substring(0, 50),
+      step,
+      selectedIssuesCount: selectedIssues?.length,
+      issueQueueCount: issueQueue?.length,
+      currentIssueIndex
+    });
 
     if (!userId) {
+      console.log('[DEBUG-ONBOARDING] Authentication invalid or missing user ID');
       return res.status(401).json({ error: 'Authentication invalid or missing user ID.' });
     }
 
@@ -130,23 +140,43 @@ router.post('/message', requireAuth, async (req: AuthenticatedRequest, res: Resp
     });
 
     if (!agent) {
+      console.log('[DEBUG-ONBOARDING] Agent not found for user:', userId);
       return res.status(404).json({ error: 'Agent not found for user' });
     }
+    
+    console.log('[DEBUG-ONBOARDING] Found agent:', {
+      id: agent.id,
+      name: agent.name,
+      onboardingCompleted: agent.onboardingCompleted
+    });
 
     // Call FSM onboarding logic
-    const result = await (await import('../services/agent-service')).conductOnboardingChat(
-      userId,
-      agent.id,
-      message,
-      {
-        step,
-        selectedIssues,
-        issueQueue,
-        currentIssueIndex
-      }
-    );
-
-    return res.json(result);
+    console.log('[DEBUG-ONBOARDING] Calling conductOnboardingChat...');
+    try {
+      const result = await (await import('../services/agent-service')).conductOnboardingChat(
+        userId,
+        agent.id,
+        message,
+        {
+          step,
+          selectedIssues,
+          issueQueue,
+          currentIssueIndex
+        }
+      );
+      
+      console.log('[DEBUG-ONBOARDING] Chat result:', {
+        nextStep: result.nextStep,
+        completedOnboarding: result.completedOnboarding,
+        extractedPreferencesKeys: result.extractedPreferences ? Object.keys(result.extractedPreferences) : [],
+        responseLength: result.response?.length
+      });
+      
+      return res.json(result);
+    } catch (chatError) {
+      console.error('[DEBUG-ONBOARDING] Error in conductOnboardingChat:', chatError);
+      throw chatError;
+    }
   } catch (error) {
     console.error('Error in onboarding message route:', error);
     return res.status(500).json({ error: 'Internal server error' });

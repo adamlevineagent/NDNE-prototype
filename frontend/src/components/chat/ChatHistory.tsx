@@ -15,6 +15,7 @@ export interface ChatHistoryProps {
   loading: boolean;
   agentColor?: string;
   agentName?: string;
+  userName?: string;
 }
 
 const ChatHistory: React.FC<ChatHistoryProps> = ({
@@ -24,6 +25,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({
   loading,
   agentColor,
   agentName,
+  userName,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -32,7 +34,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({
   // Add debug logging for messages
   useEffect(() => {
     // Removed debug log
-  }, [messages, agentName]);
+  }, [messages, agentName, userName]);
 
   // Scroll to bottom when new messages are added (but not when loading more history)
   useEffect(() => {
@@ -98,7 +100,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({
           {/* Add debug overlay for development */}
           {process.env.NODE_ENV !== 'production' && (
             <div className="debug-info" style={{ fontSize: '10px', color: '#666', padding: '4px', background: '#f9f9f9' }}>
-              Messages: {messages.length} | Agent: {agentName}
+              Messages: {messages.length} | Agent: {agentName} | User: {userName}
             </div>
           )}
           {messages.map((message) => (
@@ -107,6 +109,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({
               message={message}
               agentColor={agentColor}
               agentName={agentName}
+              userName={userName}
             />
           ))}
         </>

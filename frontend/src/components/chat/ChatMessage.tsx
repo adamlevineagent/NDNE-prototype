@@ -11,12 +11,14 @@ export interface ChatMessageProps {
   };
   agentColor?: string;
   agentName?: string;
+  userName?: string;
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
   agentColor = '#007bff',
-  agentName = 'Agent'
+  agentName = 'Agent',
+  userName = 'You'
 }) => {
   const isAgent = message.sender === 'agent';
   
@@ -26,9 +28,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     minute: '2-digit'
   });
 
-  // Roo Debug: Check agent name in ChatMessage
-  // Roo Debug: Check agent name in ChatMessage - Attempt 5
-  // Debug color value in detail
+  // Debug the names passed to ChatMessage
+  console.log(`[DEBUG_NAMES] ChatMessage rendering:`, {
+    isAgent,
+    sender: message.sender,
+    messageName: isAgent ? (message.metadata?.agentName || agentName) : (message.metadata?.userName || userName),
+    agentName,
+    userName,
+    hasMetadata: !!message.metadata,
+    metadataAgentName: message.metadata?.agentName,
+    metadataUserName: message.metadata?.userName
+  });
 
   return (
     <div className={`chat-message ${isAgent ? 'agent-message' : 'user-message'}`}>
@@ -44,7 +54,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       >
         <div className="message-header">
           <span className="message-sender">
-            {isAgent ? (message.metadata?.agentName || agentName) : 'You'}
+            {isAgent ?
+              // For agent messages: use metadata.agentName if available, otherwise use props agentName
+              (message.metadata?.agentName ? `${message.metadata.agentName} (Agent)` : `${agentName} (Agent)`) :
+              // For user messages: use metadata.userName if available, otherwise use props userName
+              (message.metadata?.userName ? `${message.metadata.userName} (you)` : `${userName} (you)`)}
           </span>
           <span className="message-time">{formattedTime}</span>
         </div>

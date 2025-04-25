@@ -34,8 +34,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Check if user is logged in
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
+      console.log('[DEBUG-AUTH-FIX] checkAuth running, token exists:', !!token);
       
       if (!token) {
+        console.log('[DEBUG-AUTH-FIX] No token found, setting unauthenticated state');
         setIsAuthenticated(false);
         setUser(null);
         setLoading(false);
@@ -43,18 +45,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       try {
+        console.log('[DEBUG-AUTH-FIX] Token found, fetching user data');
+        console.log('[DEBUG-AUTH-FIX] Token value:', token ? token.substring(0, 15) + '...' : 'null');
+        console.log('[DEBUG-AUTH-FIX] Token length:', token ? token.length : 0);
         // Fetch user data
         const response = await authApi.getUser();
+        console.log('[DEBUG-AUTH-FIX] User data fetch successful:', response.data ? {
+          id: response.data.id,
+          email: response.data.email,
+          hasAgent: !!response.data.agent
+        } : 'No data returned');
+        
         setUser(response.data);
         setIsAuthenticated(true);
+        console.log('[DEBUG-AUTH-FIX] Authentication successful, user set');
+        
+        // Check if we should redirect to onboarding
+        const shouldRedirectToOnboarding = response.data?.agent && !response.data.agent.onboardingCompleted;
+        const isRegistration = localStorage.getItem('just_registered') === 'true';
+        
+        console.log('[DEBUG-AUTH-FIX] Onboarding check:', {
+          shouldRedirect: shouldRedirectToOnboarding,
+          isRegistration: isRegistration,
+          onboardingCompleted: response.data?.agent?.onboardingCompleted
+        });
+        
+        if (isRegistration && shouldRedirectToOnboarding) {
+          console.log('[DEBUG-AUTH-FIX] New registration detected, redirecting to onboarding');
+          localStorage.removeItem('just_registered');
+          setTimeout(() => {
+            window.location.href = '/onboarding';
+          }, 100);
+        }
       } catch (error) {
-        console.error('Auth check failed:', error);
+        console.error('[DEBUG-AUTH] Auth check failed:', error);
         // Token invalid, clear it
         localStorage.removeItem('token');
+        console.log('[DEBUG-AUTH] Token removed due to authentication failure');
         setIsAuthenticated(false);
         setUser(null);
       } finally {
         setLoading(false);
+        console.log('[DEBUG-AUTH] Authentication check completed, loading set to false');
       }
     };
     
@@ -62,6 +94,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const login = (token: string) => {
+    console.log('[DEBUG-AUTH-FIX] Login called with token:', token ? token.substring(0, 15) + '...' : 'null');
+    console.log('[DEBUG-AUTH-FIX] Token length:', token ? token.length : 0);
     localStorage.setItem('token', token);
     setIsAuthenticated(true);
     // Fetch user data after login
@@ -70,14 +104,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const fetchUser = async (token: string) => {
     try {
+      console.log('[DEBUG-AUTH] Fetching user data after login');
       const response = await authApi.getUser();
+      console.log('[DEBUG-AUTH] User data fetch successful after login:', response.data ? {
+        id: response.data.id,
+        email: response.data.email,
+        hasAgent: !!response.data.agent,
+        agentData: response.data.agent ? {
+          id: response.data.agent.id,
+          onboardingCompleted: response.data.agent.onboardingCompleted
+        } : null
+      } : 'No data returned');
+      
       setUser(response.data);
     } catch (error) {
-      console.error('Failed to fetch user data:', error);
+      console.error('[DEBUG-AUTH] Failed to fetch user data after login:', error);
     }
   };
 
   const logout = () => {
+    console.log('[DEBUG-AUTH] Logout called');
     localStorage.removeItem('token');
     setIsAuthenticated(false);
     setUser(null);

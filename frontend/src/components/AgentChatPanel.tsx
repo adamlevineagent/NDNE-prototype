@@ -8,6 +8,7 @@ interface AgentChatPanelProps {
   onMinimize?: () => void;
   onMaximize?: () => void;
   contextualHelp?: 'positions' | 'activity' | 'proposals';
+  userName?: string; // Add user name prop
 }
 
 const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
@@ -15,7 +16,8 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
   minimized = false,
   onMinimize,
   onMaximize,
-  contextualHelp
+  contextualHelp,
+  userName
 }) => {
   const [agent, setAgent] = useState<{
     name: string;
@@ -40,8 +42,16 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
         
         if (response.ok) {
           const data = await response.json();
+          console.log("[DEBUG_NAMES] AgentChatPanel received agent data:", {
+            id: data.id,
+            name: data.name,           // This is agent's name
+            agentName: data.agentName, // This is now explicitly the agent's name
+            userName: data.userName,   // This is the user's name
+            propsUserName: userName    // This is what's passed down from parent
+          });
           setAgent({
-            name: data.name || 'Agent',
+            // Use the explicit agentName if available, otherwise use name
+            name: data.agentName || data.name || 'Agent',
             color: data.color || '#007bff'
           });
         } else {
@@ -87,7 +97,7 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
         }}
       >
         <div className="minimized-header" style={{ backgroundColor: agent?.color || '#007bff' }}>
-          <span>{agent?.name || 'Agent'}</span>
+          <span>{agent?.name ? `${agent.name} (Agent)` : 'Agent'}</span> {/* Agent name displayed in minimized state */}
         </div>
         {hasUnreadMessages && <div className="unread-indicator" />}
       </div>
@@ -100,7 +110,7 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
         className="chat-panel-header"
         style={{ backgroundColor: agent?.color || '#007bff' }}
       >
-        <h3>{agent?.name || 'Agent'}</h3>
+        <h3>{agent?.name ? `${agent.name} (Agent)` : 'Agent'}</h3> {/* Agent name displayed in maximized header */}
         <button className="minimize-button" onClick={onMinimize}>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -117,7 +127,18 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
             </p>
           </div>
         )}
-        <ChatInterface agentId={agentId} />
+        <ChatInterface
+          agentId={agentId}
+          agentName={agent?.name || 'Agent'}
+          userName={userName}
+          agentColor={agent?.color}
+        />
+        {/* Debug information - visible only in development */}
+        {process.env.NODE_ENV !== 'production' && (
+          <div style={{fontSize: '10px', background: '#f5f5f5', padding: '4px', color: '#666'}}>
+            DEBUG: Agent name: {agent?.name}, User name: {userName}
+          </div>
+        )}
       </div>
     </div>
   );

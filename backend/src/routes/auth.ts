@@ -14,42 +14,144 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 
 router.post('/register', authLimiter, async (req, res) => {
   const { email, password } = req.body;
+  console.log(`[DEBUG-REG] Registration attempt for email: ${email}`);
   if (!email || !password) return res.status(400).json({ error: 'Missing email or password' });
   try {
+    // Check database connection first
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      console.log('[DEBUG-REG] Database connection successful');
+    } catch (dbError) {
+      console.error('[DEBUG-REG] Database connection failed:', dbError);
+      return res.status(500).json({ error: 'Database connection error' });
+    }
+    
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Email already in use' });
+    
+    console.log('[DEBUG] Creating new user with email:', email);
     const passwordHash = await bcrypt.hash(password, 10);
+    
     // Generate and encrypt user keys
-    const { privateKey: userPriv, publicKey: userPub } = await generateKeyPair();
-    const encUserPriv = encryptPrivateKey(userPriv);
+    console.log('[DEBUG] Generating user keys');
+    let userPriv, userPub, encUserPriv;
+    try {
+      const userKeys = await generateKeyPair();
+      userPriv = userKeys.privateKey;
+      userPub = userKeys.publicKey;
+      encUserPriv = encryptPrivateKey(userPriv);
+      console.log('[DEBUG] User keys generated successfully');
+    } catch (keyError) {
+      console.error('[DEBUG] Error generating user keys:', keyError);
+      return res.status(500).json({ error: 'Failed to generate keys' });
+    }
+    
     // Generate and encrypt agent keys
-    const { privateKey: agentPriv, publicKey: agentPub } = await generateKeyPair();
-    const encAgentPriv = encryptPrivateKey(agentPriv);
+    console.log('[DEBUG] Generating agent keys');
+    let agentPriv, agentPub, encAgentPriv;
+    try {
+      const agentKeys = await generateKeyPair();
+      agentPriv = agentKeys.privateKey;
+      agentPub = agentKeys.publicKey;
+      encAgentPriv = encryptPrivateKey(agentPriv);
+      console.log('[DEBUG] Agent keys generated successfully');
+    } catch (keyError) {
+      console.error('[DEBUG] Error generating agent keys:', keyError);
+      return res.status(500).json({ error: 'Failed to generate keys' });
+    }
+    
     // Create user record
-    const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        publicKey: Buffer.from(userPub).toString('hex'),
-        encryptedPrivKey: encUserPriv,
-      },
-    });
+    let user;
+    try {
+      console.log('[DEBUG] Creating user in database');
+      user = await prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          publicKey: Buffer.from(userPub).toString('hex'),
+          encryptedPrivKey: encUserPriv,
+        },
+      });
+      console.log('[DEBUG] User created successfully:', user.id);
+    } catch (userError: any) {
+      console.error('[DEBUG] Error creating user:', userError.message);
+      return res.status(500).json({ error: 'Failed to create user account' });
+    }
+    
     // Create agent record with placeholder identity
-    const agent = await prisma.agent.create({
-      data: {
-        userId: user.id,
-        name: 'Agent',
-        color: '#000000',
-        publicKey: Buffer.from(agentPub).toString('hex'),
-        encryptedPrivKey: encAgentPriv,
-        preferences: {},
-      },
-    });
-    const token = jwt.sign({ userId: user.id, agentId: agent.id }, process.env.JWT_SECRET!, { expiresIn: '1h' });
-    res.json({ token });
+    let agent;
+    try {
+      console.log('[DEBUG] Creating agent in database');
+      agent = await prisma.agent.create({
+        data: {
+          userId: user.id,
+          name: 'Agent',
+          color: '#000000',
+          publicKey: Buffer.from(agentPub).toString('hex'),
+          encryptedPrivKey: encAgentPriv,
+          preferences: {},
+          scenarioPreferences: {},
+        },
+      });
+      console.log('[DEBUG] Agent created successfully:', agent.id);
+    } catch (agentError: any) {
+      console.error('[DEBUG] Error creating agent:', agentError.message);
+      return res.status(500).json({ error: 'Failed to create agent account' });
+    }
+    
+    try {
+      // Triple check JWT secret is available and valid
+      if (!process.env.JWT_SECRET) {
+        console.error('[DEBUG-CRITICAL] JWT_SECRET is undefined during token generation!');
+        return res.status(500).json({ error: 'Server configuration error: Missing JWT secret' });
+      }
+      
+      if (process.env.JWT_SECRET === 'change-me') {
+        console.error('[DEBUG-CRITICAL] JWT_SECRET is using placeholder value "change-me"!');
+        return res.status(500).json({ error: 'Server configuration error: Invalid JWT secret' });
+      }
+      
+      console.log('[DEBUG-CRITICAL] Generating JWT token with secret:',
+        process.env.JWT_SECRET ? `${process.env.JWT_SECRET.substring(0, 3)}...${process.env.JWT_SECRET.substring(process.env.JWT_SECRET.length - 3)}` : 'MISSING');
+      console.log('[DEBUG-CRITICAL] JWT secret length:', process.env.JWT_SECRET.length);
+      console.log('[DEBUG-CRITICAL] JWT payload:', { userId: user.id, agentId: agent.id });
+      
+      const token = jwt.sign(
+        { userId: user.id, agentId: agent.id },
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' } // Extend token lifetime to reduce login frequency
+      );
+      
+      // Validate generated token immediately
+      try {
+        const verified = jwt.verify(token, process.env.JWT_SECRET) as any;
+        console.log('[DEBUG-CRITICAL] Token verification successful:', {
+          userId: verified.userId === user.id ? 'matches' : 'mismatch',
+          agentId: verified.agentId === agent.id ? 'matches' : 'mismatch'
+        });
+      } catch (verifyError) {
+        console.error('[DEBUG-CRITICAL] Token verification failed immediately after generation:', verifyError);
+        return res.status(500).json({ error: 'Failed to verify authentication token' });
+      }
+      
+      console.log('[DEBUG-CRITICAL] Token generated successfully, length:', token.length);
+      console.log('[DEBUG-CRITICAL] Token prefix:', token.substring(0, 15) + '...');
+      console.log('[DEBUG-CRITICAL] Registration complete, sending token');
+      res.json({ token });
+    } catch (tokenError) {
+      console.error('[DEBUG-CRITICAL] Error generating token:', tokenError);
+      console.error('[DEBUG-CRITICAL] JWT_SECRET defined:', !!process.env.JWT_SECRET);
+      console.error('[DEBUG-CRITICAL] JWT_SECRET length:', process.env.JWT_SECRET?.length || 0);
+      return res.status(500).json({ error: 'Failed to generate authentication token' });
+    }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal error' });
+    console.error('[DEBUG-REG] Unhandled error during registration:', error);
+    // More detailed error logging
+    if (error instanceof Error) {
+      console.error('[DEBUG-REG] Error message:', error.message);
+      console.error('[DEBUG-REG] Error stack:', error.stack);
+    }
+    res.status(500).json({ error: 'Internal error during registration' });
   }
 });
 

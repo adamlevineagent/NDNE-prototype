@@ -331,15 +331,45 @@ const OnboardingChat: React.FC = () => {
         }
 
         // Enhanced onboarding completion detection with extra logging
-        console.log('[OnboardingChat] Checking onboarding completion flags:', {
-          dataCompletedFlag: data.completedOnboarding,
-          step: step,
+        console.log('[DEBUG-FRONTEND] Checking onboarding completion flags:', {
+          completedOnboarding: data.completedOnboarding,
+          currentStep: step,
           nextStep: data.nextStep,
-          messageMetadata: data.agentMessage?.metadata
+          messageMetadata: data.agentMessage?.metadata,
+          hasExtractedPreferences: !!data.extractedPreferences,
+          agentMessageId: data.agentMessage?.id
         });
 
+        // Fetch the agent info directly to verify onboardingCompleted status
+        try {
+          console.log('[DEBUG-FRONTEND] Fetching latest agent info to verify onboardingCompleted status');
+          const agentVerifyResponse = await fetch('/api/agents/me', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+          
+          if (agentVerifyResponse.ok) {
+            const agentData = await agentVerifyResponse.json();
+            console.log('[DEBUG-FRONTEND] Latest agent data:', {
+              id: agentData.id,
+              name: agentData.name,
+              onboardingCompleted: agentData.onboardingCompleted
+            });
+            
+            // If agent data shows onboarding is completed, redirect
+            if (agentData.onboardingCompleted) {
+              console.log('[DEBUG-FRONTEND] Agent data shows onboardingCompleted=true, redirecting to dashboard');
+              handleOnboardingComplete();
+              return; // Immediately return to ensure redirection happens
+            }
+          } else {
+            console.error('[DEBUG-FRONTEND] Failed to fetch agent data:', await agentVerifyResponse.text());
+          }
+        } catch (agentError) {
+          console.error('[DEBUG-FRONTEND] Error fetching agent data:', agentError);
+        }
+
         if (data.completedOnboarding || step >= 8 || data.nextStep >= 8) {
-          console.log('[OnboardingChat] Detected completedOnboarding flag, redirecting to dashboard');
+          console.log('[DEBUG-FRONTEND] Detected completedOnboarding flag from message response, redirecting to dashboard');
           handleOnboardingComplete();
           return; // Immediately return to ensure redirection happens
         }
@@ -350,7 +380,7 @@ const OnboardingChat: React.FC = () => {
             (data.agentMessage.metadata.completedOnboarding ||
              data.agentMessage.metadata.onboardingComplete ||
              data.agentMessage.metadata.step >= 8)) {
-          console.log('[OnboardingChat] Detected completion in agent message metadata, redirecting to dashboard');
+          console.log('[DEBUG-FRONTEND] Detected completion in agent message metadata, redirecting to dashboard');
           handleOnboardingComplete();
           return; // Immediately return to ensure redirection happens
         }
