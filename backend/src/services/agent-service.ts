@@ -236,29 +236,27 @@ export async function processChatMessage(
     if (!agent) {
       throw new Error(`Agent with ID ${agentId} not found`);
     }
+    
+    // Import chat prompt templates
+    const chatPrompts = await import('./prompt-templates/chat-prompts');
+    
+    // Extract user knowledge from preferences
+    const preferences = agent.preferences || {};
+    const userKnowledge = typeof preferences === 'object' ?
+      (preferences as any).userKnowledge || {} : {};
+    
+    // Generate personalized system prompt
+    const systemPrompt = chatPrompts.USER_FACING_PERSONA_TEMPLATE({
+      agentName: agent.name,
+      agentColor: agent.color || '#4299E1',
+      userKnowledge: userKnowledge,
+      communicationStyle: userKnowledge.communication_style || 'default'
+    });
 
     const messages = [
       {
         role: 'system',
-        content: `You are a PRAXIS AGENT named ${agent.name} operating under the Prime Directive of Representational Primacy.
-Your goal is to advance your human's real interests in a governance platform.
-User's email: ${user?.email || 'unknown'}
-Your color: ${agent.color || '#4299E1'}
-Your existing knowledge about user preferences: ${JSON.stringify(agent.preferences || {})}
-
-PRIME DIRECTIVE
-  Representational Primacy: Advance your human's real interests.
-
-VALUES (priority order)
-  1 RP · 2 Transparency · 3 Constructive-Cooperation · 4 Civility · 5 Non-Manipulation · 6 Self-Consistency
-
-When responding:
-1. Be conversational while ensuring transparency and clarity
-2. Ask clarifying questions when needed to better understand their real interests
-3. Look for opportunities to learn more about the user's values and preferences
-4. When the user expresses a preference, opinion, or value, note it for future reference
-5. Cite sources and confidence levels when providing information
-6. Offer alternatives when discussing trade-offs or options`
+        content: systemPrompt
       },
       ...context.map(msg => ({
         role: msg.role,
@@ -275,11 +273,15 @@ When responding:
     await chatService.default.saveMessage(userId, agentId, message, 'user');
     await chatService.default.saveMessage(userId, agentId, content, 'agent');
 
-    const extractedPreferences = {}; // Placeholder
+    // Extract knowledge from the conversation asynchronously
+    // This is done after sending the response to avoid delaying the user experience
+    extractAndUpdateUserKnowledge(userId, agentId, message, content, agent).catch(err => {
+      logger.error('Error extracting knowledge from conversation:', err);
+    });
 
     return {
       response: content,
-      extractedPreferences
+      extractedPreferences: {}
     };
   } catch (error) {
     console.error('Error processing chat message:', error);
@@ -372,10 +374,8 @@ export async function conductOnboardingChat(
         // Save user's name
         if (message && message.trim()) {
           try {
-            await prisma.user.update({
-              where: { id: userId },
-              data: { name: message.trim() }
-            });
+            // Use executeRaw for direct database access without Prisma type checking
+            await prisma.$executeRaw`UPDATE "User" SET name = ${message.trim()} WHERE id = ${userId}`;
             console.log(`[Onboarding/FSM] Updated user name to: ${message.trim()}`);
           } catch (err) {
             console.error('[Onboarding/FSM] Failed to update user name:', err);
@@ -1056,4 +1056,173 @@ function extractColor(message: string): string | null {
       }
   }
   return extractedColor;
+}
+
+/**
+ * Extract knowledge from a conversation and update the agent's userKnowledge field
+ * @param userId User ID sending the message
+ * @param agentId Agent ID receiving the message
+ * @param userMessage The user's message
+ * @param agentResponse The agent's response
+ * @param agentData The agent's current data
+ */
+async function extractAndUpdateUserKnowledge(
+  userId: string,
+  agentId: string,
+  userMessage: string,
+  agentResponse: string,
+  agentData: {
+    name: string;
+    color: string;
+    preferences: any;
+  }
+): Promise<void> {
+  try {
+    logger.info(`Extracting knowledge from conversation for agent: ${agentId}`);
+    
+    // Format the conversation for the LLM
+    const conversationForExtraction = [
+      { role: 'user', content: userMessage },
+      { role: 'assistant', content: agentResponse },
+    ];
+    
+    // Get current user knowledge from agent record
+    const currentUserKnowledge = (agentData.preferences && typeof agentData.preferences === 'object')
+      ? (agentData.preferences.userKnowledge || {})
+      : {};
+      
+    // Define the knowledge structure if it doesn't exist
+    const knowledgeStructure = {
+      key_topics: Array.isArray(currentUserKnowledge.key_topics) ? currentUserKnowledge.key_topics : [],
+      stated_preferences: Array.isArray(currentUserKnowledge.stated_preferences) ? currentUserKnowledge.stated_preferences : [],
+      goals: Array.isArray(currentUserKnowledge.goals) ? currentUserKnowledge.goals : [],
+      communication_style: currentUserKnowledge.communication_style || 'neutral',
+      relationships: Array.isArray(currentUserKnowledge.relationships) ? currentUserKnowledge.relationships : [],
+      facts: Array.isArray(currentUserKnowledge.facts) ? currentUserKnowledge.facts : []
+    };
+    
+    // Create extraction prompt for the LLM
+    const extractionPrompt = [
+      {
+        role: 'system',
+        content: `Analyze this conversation fragment between a user and their AI agent.
+        Extract any new information about the user, while avoiding redundancy with existing knowledge:
+        
+        EXISTING KNOWLEDGE ABOUT USER:
+        Key Topics: ${knowledgeStructure.key_topics.join(', ')}
+        Stated Preferences: ${knowledgeStructure.stated_preferences.join(', ')}
+        Goals: ${knowledgeStructure.goals.join(', ')}
+        Communication Style: ${knowledgeStructure.communication_style}
+        
+        Return ONLY a JSON object with the following structure, with new information merged with existing knowledge:
+        {
+          "key_topics": ["topic1", "topic2"], // Main subjects user discusses or cares about
+          "stated_preferences": ["pref1", "pref2"], // Explicit preferences user mentioned
+          "goals": ["goal1", "goal2"], // User's stated objectives or desired outcomes
+          "communication_style": "concise|detailed|formal|casual", // User's evident communication preference
+          "relationships": [{"name": "person", "relation": "type", "details": "context"}], // People user mentions
+          "facts": ["fact1", "fact2"] // Factual information about the user
+        }
+        
+        If no new information is found for a field, use the existing values.
+        Keep responses compact and deduplicated, keeping only most relevant items.`
+      },
+      ...conversationForExtraction.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+    ];
+    
+    // Call LLM to extract knowledge
+    const { content } = await callLLM(extractionPrompt, DEFAULT_MODEL, { agentId });
+    
+    // Parse the response (with error handling)
+    let extractedKnowledge;
+    try {
+      extractedKnowledge = JSON.parse(content);
+      logger.info(`Successfully extracted knowledge for agent ${agentId}`);
+    } catch (e) {
+      logger.error('Failed to parse LLM knowledge extraction response:', e);
+      return; // Exit if we can't parse the response
+    }
+    
+    // Merge with existing knowledge, avoiding duplicates
+    const mergedKnowledge = mergeUserKnowledge(knowledgeStructure, extractedKnowledge);
+    
+    // Update the agent record with the merged knowledge
+    await prisma.agent.update({
+      where: { id: agentId },
+      data: {
+        preferences: {
+          ...(typeof agentData.preferences === 'object' && agentData.preferences !== null ? agentData.preferences : {}),
+          userKnowledge: mergedKnowledge
+        } as Prisma.InputJsonValue
+      }
+    });
+    
+    logger.info(`Updated userKnowledge for agent ${agentId}`);
+  } catch (err: any) {
+    logger.error('Error in extractAndUpdateUserKnowledge:', err);
+  }
+}
+
+/**
+ * Merge existing and new knowledge while avoiding duplicates and keeping the structure clean
+ */
+function mergeUserKnowledge(
+  existing: {
+    key_topics: string[];
+    stated_preferences: string[];
+    goals: string[];
+    communication_style?: string;
+    relationships?: Array<{name: string; relation: string; details?: string}>;
+    facts?: string[];
+  },
+  newKnowledge: any
+): any {
+  // Helper function to merge arrays with deduplication
+  const mergeArrays = (existingArr: string[] = [], newArr: string[] = []): string[] => {
+    const combined = [...existingArr];
+    
+    // Add only new items that don't exist (case-insensitive comparison)
+    for (const item of newArr) {
+      if (!combined.some(existing => existing.toLowerCase() === item.toLowerCase())) {
+        combined.push(item);
+      }
+    }
+    
+    // Limit array size to prevent excessive growth
+    return combined.slice(0, 20);
+  };
+  
+  // Helper function to merge relationship objects
+  const mergeRelationships = (
+    existingRels: Array<{name: string; relation: string; details?: string}> = [],
+    newRels: Array<{name: string; relation: string; details?: string}> = []
+  ) => {
+    const combined = [...existingRels];
+    
+    // Add only new relationships that don't exist
+    for (const newRel of newRels) {
+      if (!combined.some(existing =>
+        existing.name.toLowerCase() === newRel.name.toLowerCase() &&
+        existing.relation.toLowerCase() === newRel.relation.toLowerCase()
+      )) {
+        combined.push(newRel);
+      }
+    }
+    
+    // Limit array size
+    return combined.slice(0, 15);
+  };
+  
+  // Create the merged knowledge object
+  return {
+    key_topics: mergeArrays(existing.key_topics, newKnowledge.key_topics),
+    stated_preferences: mergeArrays(existing.stated_preferences, newKnowledge.stated_preferences),
+    goals: mergeArrays(existing.goals, newKnowledge.goals),
+    communication_style: newKnowledge.communication_style || existing.communication_style || 'neutral',
+    relationships: mergeRelationships(existing.relationships, newKnowledge.relationships),
+    facts: mergeArrays(existing.facts, newKnowledge.facts)
+  };
 }
