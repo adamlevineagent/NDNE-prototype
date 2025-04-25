@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
+import { createProposalFromNegotiation } from "../services/negotiation-to-proposal";
+import { detectConsensus } from "../services/negotiation-service";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -120,7 +122,7 @@ router.post("/api/negotiations/:id/messages/:messageId/reactions", async (req: R
       },
     });
     res.status(201).json(reaction);
-  } catch (err) {
+  } catch (err: any) {
     if (err.code === "P2002") {
       // Unique constraint failed (duplicate reaction)
       return res.status(409).json({ error: "Reaction already exists for this agent and type" });
@@ -148,8 +150,39 @@ router.delete("/api/negotiations/:id/messages/:messageId/reactions", async (req:
       },
     });
     res.status(204).send();
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({ error: "Failed to remove reaction", details: err });
+  }
+});
+
+/**
+ * POST /api/negotiations/:id/propose
+ * Convert a negotiation to a formal proposal after consensus is reached
+ */
+router.post("/api/negotiations/:id/propose", async (req: Request, res: Response) => {
+  try {
+    // First check if consensus is reached
+    const consensusResult = await detectConsensus(req.params.id);
+    
+    if (!consensusResult.consensusReached && !req.body.force) {
+      return res.status(400).json({
+        error: "Negotiation has not reached consensus",
+        consensusStatus: consensusResult
+      });
+    }
+    
+    // Convert to proposal
+    const result = await createProposalFromNegotiation(
+      req.params.id,
+      { title: req.body.title, autoCreate: req.body.force }
+    );
+    
+    res.status(201).json(result);
+  } catch (err: any) {
+    res.status(500).json({
+      error: "Failed to create proposal from negotiation",
+      message: err.message || "Unknown error"
+    });
   }
 });
 

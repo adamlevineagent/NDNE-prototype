@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import './ProposalDetail.css';
 import apiClient, { agents } from '../api/apiClient';
 import NegotiationThread from '../components/NegotiationThread';
+import NegotiationFeedback from '../components/NegotiationFeedback';
+import NegotiationHistory from '../components/NegotiationHistory';
 
 interface Vote {
   id: string;
@@ -27,7 +30,9 @@ interface ProposalDetail {
   closeAt: string;
   votes: Vote[];
   comments: Comment[];
-  negotiationId?: string; // Add negotiationId if present
+  negotiationId?: string;
+  isNegotiated: boolean;
+  negotiationSummary?: string;
 }
 
 const ProposalDetail: React.FC = () => {
@@ -74,27 +79,47 @@ const ProposalDetail: React.FC = () => {
   }
 
   return (
-    <div>
+    <div className="proposal-detail">
       <h1>{proposal.title}</h1>
-      <p>Status: {proposal.status}</p>
-      <p>Type: {proposal.type}</p>
-      {proposal.type === 'monetary' && proposal.amount !== undefined && (
-        <p>Amount: {proposal.amount}</p>
-      )}
-      <p>Created At: {new Date(proposal.createdAt).toLocaleString()}</p>
-      <p>Closes At: {new Date(proposal.closeAt).toLocaleString()}</p>
+      
+      <div className="proposal-meta">
+        <p><strong>Status:</strong> {proposal.status}</p>
+        <p><strong>Type:</strong> {proposal.type}</p>
+        {proposal.type === 'monetary' && proposal.amount !== undefined && (
+          <p><strong>Amount:</strong> ${proposal.amount.toLocaleString()}</p>
+        )}
+        <p><strong>Created:</strong> {new Date(proposal.createdAt).toLocaleString()}</p>
+        <p><strong>Closes:</strong> {new Date(proposal.closeAt).toLocaleString()}</p>
+      </div>
+
       <h2>Description</h2>
-      <p>{proposal.description}</p>
+      <div className="proposal-description">
+        {proposal.description.split('\n').map((paragraph, i) => (
+          <p key={i}>{paragraph}</p>
+        ))}
+      </div>
+      
+      {/* Negotiation Summary (if proposal came from negotiation) */}
+      {proposal.isNegotiated && proposal.negotiationSummary && (
+        <div className="negotiation-summary">
+          <h2>Negotiation Summary</h2>
+          <div className="summary-content">
+            <p>{proposal.negotiationSummary}</p>
+          </div>
+        </div>
+      )}
+
       <h2>Votes</h2>
-      <ul>
+      <ul className="votes-list">
         {proposal.votes.map((vote) => (
           <li key={vote.id}>
             {vote.value.toUpperCase()} at {new Date(vote.createdAt).toLocaleString()}
           </li>
         ))}
       </ul>
+
       <h2>Comments</h2>
-      <ul>
+      <ul className="comments-list">
         {proposal.comments.map((comment) => (
           <li key={comment.id}>
             {comment.agentName ? `${comment.agentName}: ` : ''}
@@ -102,16 +127,32 @@ const ProposalDetail: React.FC = () => {
           </li>
         ))}
       </ul>
-      {/* Negotiation Thread */}
-      {proposal.negotiationId && agentId && (
-        <div
-          style={{ marginTop: "2rem" }}
-          role="region"
-          aria-label="Negotiation Thread for this Proposal"
-          tabIndex={0}
-        >
-          <h2>Negotiation Thread</h2>
-          <NegotiationThread negotiationId={proposal.negotiationId} agentId={agentId} />
+
+      {/* Negotiation Details Section */}
+      {proposal.negotiationId && (
+        <div className="negotiation-section">
+          <h2>Negotiation Details</h2>
+          
+          {/* Negotiation History Component */}
+          <NegotiationHistory negotiationId={proposal.negotiationId} />
+          
+          {/* Live Negotiation Thread */}
+          {agentId && (
+            <div className="live-negotiation">
+              <h3>Participate in Negotiation</h3>
+              <NegotiationThread negotiationId={proposal.negotiationId} agentId={agentId} />
+            </div>
+          )}
+          
+          {/* Feedback Component */}
+          {agentId && proposal.isNegotiated && (
+            <div className="negotiation-feedback-container">
+              <NegotiationFeedback
+                negotiationId={proposal.negotiationId}
+                agentId={agentId}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

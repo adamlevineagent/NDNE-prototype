@@ -1,45 +1,73 @@
-Implementing Proposal & Negotiation Integration
+# Implementing Proposal & Negotiation Integration
 Goal: Connect completed negotiations to the proposal system and allow user feedback on agent performance.
 
-Relevant Files:
+## Completed Implementation Tasks:
 
-backend/src/services/negotiation-to-proposal.ts (New)
-backend/src/services/feedback-service.ts (New)
-backend/src/routes/negotiation.ts (Extend)
-backend/src/routes/feedback.ts (New)
-backend/src/routes/proposal.ts (Potentially extend)
-backend/prisma/schema.prisma
-frontend/src/pages/ProposalDetail.tsx
-frontend/src/components/NegotiationFeedback.tsx (New)
-frontend/src/components/NegotiationHistory.tsx (New)
-Implementation Steps:
+### Database Changes:
+- ✅ Created `NegotiationFeedback` model in schema.prisma for storing user feedback
+- ✅ Set up @@unique constraint to prevent duplicate feedback
+- ✅ Added proper relations to Agent and NegotiationSession
+- ✅ Created migration file (20250425102800_add_negotiation_feedback)
 
-Create Negotiation-to-Proposal Service:
-File: backend/src/services/negotiation-to-proposal.ts
-Action: Implement createProposalFromNegotiation(negotiationId: string):
-Fetch the NegotiationSession and its messages.
-Verify status is 'completed' and consensus was reached.
-Call LLM (using a new summarization prompt) to generate a concise title and description for the Proposal based on the negotiation's consensus terms.
-Extract other necessary fields (e.g., type, amount if applicable) from negotiation metadata or consensus terms.
-Create a new Proposal record using prisma.proposal.create, setting the negotiationId, isNegotiated: true, and negotiationSummary.
-Return the ID of the newly created proposal.
-Implement API Endpoint:
-File: backend/src/routes/negotiation.ts
-Action: Add a POST /api/negotiations/:id/propose route. This route should call negotiation-service.detectConsensus first. If consensus is confirmed, it then calls negotiation-to-proposal.createProposalFromNegotiation. Return the created proposal details or an error.
-Enhance ProposalDetail.tsx:
-Action: Modify the component to fetch proposal data including the negotiationId, isNegotiated, and negotiationSummary fields.
-Action: If isNegotiated is true:
-Display the negotiationSummary.
-Add a section or button to view the full "Negotiation History".
-Implement or integrate a NegotiationHistory.tsx component (potentially reusing NegotiationThread.tsx logic in a read-only mode) to display the associated messages when requested.
-Integrate the NegotiationFeedback.tsx component.
-Implement Feedback System:
-Action: Create frontend/src/components/NegotiationFeedback.tsx. Include input elements for rating (e.g., 1-5 stars) representation accuracy and a text area for comments.
-Action: Create backend/src/routes/feedback.ts with POST /api/feedback/negotiation/:negotiationId endpoint. It should accept agentId, rating, comments, etc.
-Action: Create backend/src/services/feedback-service.ts. Implement processFeedback to store the feedback (new Feedback model likely needed in schema.prisma). Implement updateAgentFromFeedback (optional, more complex) to potentially adjust Agent.alignmentScore or add insights to Agent.userKnowledge based on the feedback.
-Action: Connect the NegotiationFeedback.tsx form submission to the new backend endpoint.
-Key Considerations:
+### Negotiation-to-Proposal Service:
+- ✅ Created `negotiation-to-proposal.ts` service implementing:
+  - `createProposalFromNegotiation(negotiationId)` function:
+    - Fetches negotiation session with messages
+    - Verifies consensus was reached
+    - Extracts negotiation metadata
+    - Generates proposal title and description using LLM
+    - Creates a new formal proposal with appropriate fields
 
-Summarization Quality: The quality of the LLM-generated proposal title/description from the negotiation history is crucial. Fine-tune the summarization prompt.
-Feedback Impact: Decide how user feedback will concretely influence agent behavior or metrics. Simply storing it is the first step; acting on it requires more complex logic.
-UI Flow: Ensure the transition from viewing a negotiation to viewing the resulting proposal (and vice-versa) is clear and intuitive.
+### API Endpoints:
+- ✅ Added POST `/api/negotiations/:id/propose` to create proposals from negotiations
+- ✅ Added feedback endpoints:
+  - POST `/api/feedback/negotiation/:negotiationId` - Submit feedback
+  - GET `/api/feedback/negotiation/:negotiationId` - Get feedback for a negotiation
+  - GET `/api/feedback/agent/:agentId` - Get all feedback for an agent
+
+### Feedback System:
+- ✅ Created `feedback-service.ts` implementing:
+  - `processFeedback()` for storing and updating feedback
+  - `updateAgentFromFeedback()` to adjust agent alignment score based on feedback
+  - `getFeedback()` for retrieving feedback records
+
+### Frontend Components:
+- ✅ Created `NegotiationFeedback.tsx` component for rating agent performance:
+  - 1-5 star rating system for overall performance
+  - 1-5 star rating for representation accuracy
+  - Comment field for detailed feedback
+  - Handling for updating existing feedback
+- ✅ Created `NegotiationHistory.tsx` to display negotiation messages in read-only mode:
+  - Shows negotiation metadata (topic, status, participants)
+  - Displays all messages with agent names and timestamps
+  - Shows reactions on each message
+- ✅ Enhanced `ProposalDetail.tsx` to:
+  - Display negotiation summary for proposals from negotiations
+  - Integrate the feedback component
+  - Show negotiation history in read-only mode
+  - Add CSS styling for improved user experience
+
+### Server Configuration:
+- ✅ Updated `index.ts` to include new routes and middleware
+
+## Key Implementation Highlights:
+
+1. **Bidirectional Integration**
+   - Negotiations can be converted into formal proposals
+   - Proposals display their negotiation history
+   - Negotiations reference proposals they generate
+
+2. **Feedback Loop**
+   - Users can rate agent performance in negotiations
+   - Feedback directly impacts agent alignment scores
+   - Historical feedback trends are tracked in agent knowledge
+
+3. **Enhanced UI/UX**
+   - Clean, organized display of negotiation history
+   - Intuitive feedback interface with star ratings
+   - Clear visualization of negotiation status and summary
+
+4. **Data Flow**
+   - Frontend components → API endpoints → Service layer → Database
+   - LLM summarization for human-friendly proposal generation
+   - Structured data storage with proper relations

@@ -50,6 +50,7 @@ model Agent {
   chatMessages        ChatMessage[]
   negotiationMessages NegotiationMessage[]
   negotiationReactions NegotiationReaction[]
+  negotiationFeedback NegotiationFeedback[]
 }
 
 model Proposal {
@@ -189,6 +190,7 @@ model NegotiationSession {
   initiatorId  String
   messages     NegotiationMessage[]
   proposal     Proposal?
+  feedback     NegotiationFeedback[]
 
   @@index([status])
   @@index([startedAt])
@@ -230,8 +232,28 @@ model ExampleUserArchetype {
   description String
   interests   Json     @default("[]")
   concerns    Json     @default("[]")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Feedback model for negotiation agent performance
+model NegotiationFeedback {
+  id                     String   @id @default(uuid())
+  negotiationId          String
+  agentId                String
+  userId                 String
+  rating                 Int      // 1-5 scale
+  representationAccuracy Int      // 1-5 scale
+  comments               String
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  negotiation NegotiationSession @relation(fields: [negotiationId], references: [id])
+  agent       Agent             @relation(fields: [agentId], references: [id])
+  
+  @@index([negotiationId])
+  @@index([agentId])
+  @@unique([negotiationId, agentId]) // One feedback per agent per negotiation
 }
 
 model ExampleProposal {

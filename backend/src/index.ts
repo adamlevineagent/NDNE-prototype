@@ -14,6 +14,7 @@ import onboardingRouter from './routes/onboarding'; // Import the onboarding rou
 import adminRouter from './routes/admin'; // Import the admin router
 import chatRouter from './routes/chat'; // Import the chat router
 import negotiationRouter from './routes/negotiation'; // Import the negotiation router
+import negotiationFeedbackRouter from './routes/feedback'; // Import the negotiation feedback router
 import agentMeRouter from './routes/agents/me'; // Import the agent "me" router
 import agentRouter from './routes/agents/index'; // Import the main agent router
 
@@ -56,6 +57,7 @@ app.use('/api/onboarding', onboardingRouter); // Mount the onboarding router
 app.use('/api/admin', adminRouter); // Mount the admin router
 app.use('/api/chat', chatRouter); // Mount the chat router
 app.use('/api', negotiationRouter); // Mount the negotiation router
+app.use('/api', negotiationFeedbackRouter); // Mount the negotiation feedback router
 app.use('/api/agents', agentMeRouter); // Mount the agent "me" router
 app.use('/api/agents', agentRouter); // Mount the main agent router
 app.use('/api/issues', issuesRouter); // Mount the issues router

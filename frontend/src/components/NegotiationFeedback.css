@@ -1,0 +1,125 @@
+.negotiation-feedback {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.negotiation-feedback h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #333;
+  font-size: 1.25rem;
+  border-bottom: 1px solid #e9ecef;
+  padding-bottom: 0.75rem;
+}
+
+.feedback-notice {
+  background-color: #e9f5ff;
+  border-left: 4px solid #0078d4;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  color: #444;
+}
+
+.feedback-field {
+  margin-bottom: 1.25rem;
+}
+
+.feedback-field span {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.rating-stars {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.star-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #ccc;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+}
+
+.star-button.selected {
+  color: #ffc107;
+}
+
+.star-button:hover {
+  color: #ffc107;
+}
+
+.feedback-field textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  resize: vertical;
+}
+
+.feedback-field textarea:focus {
+  outline: none;
+  border-color: #0078d4;
+  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+}
+
+.hint-text {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+.feedback-submit-button {
+  background-color: #0078d4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.feedback-submit-button:hover {
+  background-color: #006bb3;
+}
+
+.feedback-submit-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.feedback-error {
+  background-color: #ffebee;
+  color: #d32f2f;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.feedback-success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.feedback-loading {
+  color: #666;
+  font-style: italic;
+  padding: 1rem 0;
+}
