@@ -715,3 +715,23 @@ describe('Dashboard', () => {
 ## Repository Management
 
 This implementation will be committed to a new branch called `core-dashboard` that will contain all the dashboard redesign improvements. Once the implementation is complete and tested, it will be merged back into the main branch.
+
+## Recent Fixes and Updates
+
+### User/Agent Name Assignment Fix (4/25/2025)
+
+A critical issue was identified and fixed where the user and agent names were reversed in the database:
+- The user was incorrectly named "Prax" when it should have been "Adam"
+- The agent was incorrectly named "Agent" when it should have been "Prax"
+
+#### Fix Implementation:
+1. Created and executed a database update script (`backend/src/scripts/fix-name-assignment.js`) to correct the name assignments in the database
+2. Enhanced logging in DashboardContext.tsx to provide better debugging of name-related issues
+3. Added better error handling and fallback mechanisms to retrieve positions data properly from onboarding
+
+This fix resolved both the name personalization issue and ensured that the positions matrix properly displayed the issues defined during onboarding. The dashboard now correctly:
+- Displays "Hi Adam, here are your positions" (proper user name)
+- Shows the agent as "Prax (Agent)" (proper agent name)
+- Displays all issues with their correct stances that were defined during onboarding
+
+All changes have been committed to the `core-test-dashboard-dev` branch.
