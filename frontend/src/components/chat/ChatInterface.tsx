@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { chat } from '../../api/apiClient';
 import ChatHistory from './ChatHistory';
 import ChatInput from './ChatInput';
+import { useChatContext } from '../../hooks/useChatContext';
+import ForumPostDisplay from '../forum/ForumPostDisplay';
+import ForumAnalysisDisplay from '../forum/ForumAnalysisDisplay';
 import './ChatInterface.css';
 
 export interface ChatInterfaceProps {
@@ -27,6 +30,20 @@ export interface ChatMessage {
     stage?: 'initial' | 'preferences' | 'priorities' | 'confirmation' | 'complete';
     nextStage?: 'initial' | 'preferences' | 'priorities' | 'confirmation' | 'complete';
     onboardingComplete?: boolean;
+    forumPost?: {
+      title: string;
+      body: string;
+      category: string;
+    };
+    forumAnalysis?: {
+      summary: string;
+      keyTopics: string[];
+      relevanceScore: number;
+      alignmentAnalysis: string;
+      actionItems: string[];
+      sentiment?: string;
+      recommendedResponse?: string;
+    };
     [key: string]: any;
   };
 }
@@ -43,6 +60,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   agentColor, // Receive agentColor prop
   userName // Receive userName prop
 }) => {
+  // Get chat context from the hook
+  const { chatContext } = useChatContext();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -139,6 +159,38 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   }, [agentId, hasMore, isOnboarding, loading, messages]);
 
+  // Helper function to parse forum post command
+  const parseForumPostCommand = (content: string) => {
+    const regex = /\/discourse_post in category "([^"]+)" title "([^"]+)" using my preferences on "([^"]+)"/;
+    const match = content.match(regex);
+    
+    if (match) {
+      return {
+        category: match[1],
+        title: match[2],
+        topic: match[3]
+      };
+    }
+    
+    return null;
+  };
+  
+  // Helper function to parse forum read command
+  const parseForumReadCommand = (content: string) => {
+    const regex = /\/discourse_read from "([^"]+)" topic "([^"]+)": "(.*?)"/s;
+    const match = content.match(regex);
+    
+    if (match) {
+      return {
+        category: match[1],
+        topic: match[2],
+        content: match[3]
+      };
+    }
+    
+    return null;
+  };
+
   // Send a new message
   const sendMessage = async (content: string) => {
     if (onSendMessage) {
@@ -177,6 +229,50 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       // Create metadata for the API request
       let requestMetadata: any = { isOnboarding, userName };
+      
+      // Check if this is a forum command
+      const forumPostCommand = parseForumPostCommand(content);
+      const forumReadCommand = parseForumReadCommand(content);
+      
+      // Set command type in metadata if it's a forum command
+      if (forumPostCommand) {
+        requestMetadata.commandType = 'forum_post';
+        requestMetadata.forumCommand = forumPostCommand;
+      } else if (forumReadCommand) {
+        requestMetadata.commandType = 'forum_read';
+        requestMetadata.forumCommand = forumReadCommand;
+      }
+      
+      // Add context data from chatContext
+      if (chatContext?.type && chatContext?.data) {
+        console.log('[ChatInterface] Including context data in message:', {
+          contextType: chatContext.type,
+          data: chatContext.data
+        });
+        
+        requestMetadata.contextType = chatContext.type;
+        
+        // Add specific contextual data based on type
+        if (chatContext.type === 'positions') {
+          const positionsData = chatContext.data as any;
+          if (positionsData && positionsData.selectedIssue) {
+            requestMetadata.selectedIssue = positionsData.selectedIssue;
+          }
+        } else if (chatContext.type === 'activity') {
+          const activityData = chatContext.data as any;
+          if (activityData && activityData.selectedAction) {
+            requestMetadata.selectedAction = activityData.selectedAction;
+          }
+        } else if (chatContext.type === 'proposals') {
+          const proposalData = chatContext.data as any;
+          if (proposalData && proposalData.selectedProposal) {
+            requestMetadata.selectedProposal = proposalData.selectedProposal;
+          }
+        }
+        
+        // Always include the context data for the LLM to use
+        requestMetadata.context = chatContext.data;
+      }
 
       // Include current stage information if available from previous messages
       if (isOnboarding && messages.length > 0) {
@@ -197,12 +293,125 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         }
       }
 
-      // Send message to API
-      const response = await chat.sendMessage({
-        agentId,
-        content,
-        metadata: requestMetadata
-      });
+      // For forum commands, call the appropriate API endpoints
+      let response;
+      if (forumPostCommand) {
+        // Call forum post generation API
+        response = await fetch(`/api/forum/generate-post`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            agentId,
+            category: forumPostCommand.category,
+            title: forumPostCommand.title,
+            topic: forumPostCommand.topic
+          })
+        });
+        
+        const forumData = await response.json();
+        
+        // Create response including the forum post data
+        response = {
+          data: {
+            userMessage: {
+              ...tempUserMessage,
+              id: `user-${Date.now()}`
+            },
+            agentMessage: {
+              id: `agent-${Date.now()}`,
+              content: `I've generated a forum post for "${forumPostCommand.title}" in the ${forumPostCommand.category} category. Here's the content:`,
+              sender: 'agent',
+              timestamp: new Date().toISOString(),
+              metadata: {
+                forumPost: {
+                  title: forumData.title || forumPostCommand.title,
+                  body: forumData.body,
+                  category: forumPostCommand.category
+                }
+              }
+            }
+          }
+        };
+      } else if (forumReadCommand) {
+        // Call forum content processing API
+        response = await fetch(`/api/forum/process-content`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            agentId,
+            category: forumReadCommand.category,
+            topic: forumReadCommand.topic,
+            content: forumReadCommand.content
+          })
+        });
+        
+        const analysisData = await response.json();
+        
+        // Parse the forum analysis from the response
+        let forumAnalysis;
+        try {
+          // Check if the response is already a parsed object
+          if (typeof analysisData === 'object' && analysisData.summary) {
+            forumAnalysis = analysisData;
+          } else {
+            // Try to extract JSON from the text response
+            const jsonMatch = analysisData.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              forumAnalysis = JSON.parse(jsonMatch[0]);
+            } else {
+              // Fallback for plain text response
+              forumAnalysis = {
+                summary: analysisData,
+                keyTopics: [],
+                relevanceScore: 50,
+                alignmentAnalysis: "Analysis not available in structured format",
+                actionItems: ["Review the full analysis manually"]
+              };
+            }
+          }
+        } catch (error) {
+          console.error("Error parsing forum analysis:", error);
+          forumAnalysis = {
+            summary: "Failed to parse analysis result",
+            keyTopics: [],
+            relevanceScore: 0,
+            alignmentAnalysis: "Error occurred during analysis",
+            actionItems: ["Try again with different content"]
+          };
+        }
+        
+        // Create response including the forum analysis data
+        response = {
+          data: {
+            userMessage: {
+              ...tempUserMessage,
+              id: `user-${Date.now()}`
+            },
+            agentMessage: {
+              id: `agent-${Date.now()}`,
+              content: `Here's my analysis of the forum content from "${forumReadCommand.topic}" in the ${forumReadCommand.category} category:`,
+              sender: 'agent',
+              timestamp: new Date().toISOString(),
+              metadata: {
+                forumAnalysis
+              }
+            }
+          }
+        };
+      } else {
+        // Regular chat message
+        response = await chat.sendMessage({
+          agentId,
+          content,
+          metadata: requestMetadata
+        });
+      }
 
       const data = response.data;
 
@@ -261,6 +470,37 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
+  // Custom renderer for messages with forum content
+  const renderCustomMessage = (message: ChatMessage) => {
+    if (message.metadata?.forumPost) {
+      const post = message.metadata.forumPost;
+      return (
+        <ForumPostDisplay
+          title={post.title}
+          body={post.body}
+          category={post.category}
+        />
+      );
+    }
+    
+    if (message.metadata?.forumAnalysis) {
+      const analysis = message.metadata.forumAnalysis;
+      return (
+        <ForumAnalysisDisplay
+          summary={analysis.summary}
+          keyTopics={analysis.keyTopics}
+          relevanceScore={analysis.relevanceScore}
+          alignmentAnalysis={analysis.alignmentAnalysis}
+          actionItems={analysis.actionItems}
+          sentiment={analysis.sentiment}
+          recommendedResponse={analysis.recommendedResponse}
+        />
+      );
+    }
+    
+    return null;
+  };
+
   return (
     <div className="chat-interface">
       {error && (
@@ -289,7 +529,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <ChatInput
           onSendMessage={sendMessage}
           disabled={sending}
-          placeholder={sending ? "Waiting for response..." : "Type your message..."}
+          placeholder={sending ? "Waiting for response..." : "Type your message or use /discourse_post or /discourse_read commands..."}
         />
       </div>
     </div>

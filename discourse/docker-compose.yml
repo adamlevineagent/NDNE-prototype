@@ -1,0 +1,61 @@
+version: '3'
+services:
+  postgres:
+    image: postgres:15
+    container_name: discourse_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: discourse
+      POSTGRES_PASSWORD: discourse_password
+      POSTGRES_DB: discourse
+    volumes:
+      - discourse_postgres_data:/var/lib/postgresql/data
+    networks:
+      - discourse_network
+
+  redis:
+    image: redis:7
+    container_name: discourse_redis
+    restart: always
+    volumes:
+      - discourse_redis_data:/data
+    networks:
+      - discourse_network
+
+  app:
+    image: discourse/discourse:3.1.0.beta4
+    container_name: discourse_app
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8080:80"
+    environment:
+      DISCOURSE_DB_HOST: postgres
+      DISCOURSE_DB_PORT: 5432
+      DISCOURSE_DB_NAME: discourse
+      DISCOURSE_DB_USERNAME: discourse
+      DISCOURSE_DB_PASSWORD: discourse_password
+      DISCOURSE_REDIS_HOST: redis
+      DISCOURSE_DEVELOPER_EMAILS: "admin@example.com"
+      DISCOURSE_HOSTNAME: "localhost"
+      DISCOURSE_SMTP_ADDRESS: "smtp.example.com"
+      DISCOURSE_SMTP_PORT: 587
+      DISCOURSE_SMTP_USER_NAME: "user@example.com"
+      DISCOURSE_SMTP_PASSWORD: "smtp_password"
+      RAILS_ENV: development
+    volumes:
+      - discourse_shared:/shared
+      - discourse_logs:/var/www/discourse/log
+    networks:
+      - discourse_network
+
+volumes:
+  discourse_postgres_data:
+  discourse_redis_data:
+  discourse_shared:
+  discourse_logs:
+
+networks:
+  discourse_network:

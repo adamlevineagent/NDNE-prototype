@@ -25,12 +25,14 @@ export interface ChatMessageContext {
  * @param agentId Agent ID
  * @param userId User ID
  * @param limit Number of messages to include (default: 20)
+ * @param maxTokens Maximum token limit before summarizing older messages (default: 3000)
  * @returns Array of messages in LLM-friendly format
  */
 export async function getConversationContext(
   agentId: string,
   userId: string,
-  limit: number = 20
+  limit: number = 20,
+  maxTokens: number = 3000
 ): Promise<ChatMessageContext[]> {
   try {
     // Fetch recent messages using the type assertion workaround until migration is applied
@@ -42,7 +44,8 @@ export async function getConversationContext(
       orderBy: {
         timestamp: 'desc'
       },
-      take: limit
+      // Fetch more messages than needed to allow for summarization
+      take: Math.min(limit * 2, 100)
     });
 
     // Check if we found messages
@@ -62,7 +65,7 @@ export async function getConversationContext(
     }
 
     // Convert to LLM-friendly format and reverse to chronological order
-    const context = messages
+    let context = messages
       .map((msg: ChatMessageRecord) => ({
         id: msg.id,
         role: msg.sender === 'user' ? 'user' : 'assistant',
@@ -70,6 +73,41 @@ export async function getConversationContext(
         timestamp: msg.timestamp
       }))
       .reverse();
+      
+    // Estimate token count - simple heuristic: ~4 chars per token
+    const estimatedTokenCount = context.reduce((count: number, msg: ChatMessageContext) => {
+      return count + Math.ceil(msg.content.length / 4);
+    }, 0);
+    
+    logger.info(`Conversation context: ${context.length} messages, ~${estimatedTokenCount} estimated tokens`);
+    
+    // If we're over the token limit, summarize older messages
+    if (estimatedTokenCount > maxTokens && context.length > 5) {
+      logger.info(`Context exceeds ${maxTokens} tokens, summarizing older messages`);
+      
+      // Keep the most recent messages directly
+      const recentMessages = context.slice(-Math.min(Math.floor(limit / 2), 10));
+      const olderMessages = context.slice(0, -recentMessages.length);
+      
+      // Summarize older messages
+      const summary = await summarizeConversation(olderMessages);
+      
+      // Create a synthetic summary message to prepend
+      const summaryMessage: ChatMessageContext = {
+        id: `summary-${Date.now()}`,
+        role: 'system',
+        content: summary,
+        timestamp: new Date()
+      };
+      
+      // Return the summary followed by recent messages
+      context = [summaryMessage, ...recentMessages];
+      
+      logger.info(`Summarized ${olderMessages.length} older messages, returning ${context.length} context items`);
+    } else {
+      // If we don't need to summarize, just take the most recent messages up to the limit
+      context = context.slice(-Math.min(limit, context.length));
+    }
 
     return context;
   } catch (error) {
@@ -197,14 +235,48 @@ export async function summarizeConversation(
   messages: ChatMessageContext[]
 ): Promise<string> {
   try {
-    // This is a placeholder - in the actual implementation,
-    // this would use an LLM to generate a summary
-    logger.info(`Summarizing ${messages.length} messages`);
+    // Import dynamically to avoid circular dependencies
+    const agentService = await import('./agent-service');
     
-    return `This conversation contains ${messages.length} messages between the user and their agent.`;
+    // Only summarize if we have enough messages
+    if (messages.length < 5) {
+      return `Recent conversation with ${messages.length} messages.`;
+    }
+    
+    logger.info(`Summarizing ${messages.length} messages for conversation context management`);
+    
+    // Format the messages for the LLM
+    const conversationText = messages
+      .map(msg => `${msg.role}: ${msg.content}`)
+      .join('\n\n');
+    
+    // Create a prompt for the LLM to generate a summary
+    const summaryPrompt = [
+      {
+        role: 'system',
+        content: `Summarize the following conversation between a user and an AI assistant.
+        Focus on key points, user preferences, concerns, and information shared.
+        Create a concise but comprehensive summary that captures the important context
+        needed to continue the conversation effectively. Include any specific details
+        that would be important for providing relevant assistance in follow-up conversations.`
+      },
+      {
+        role: 'user',
+        content: conversationText
+      }
+    ];
+    
+    // Call the LLM to generate the summary
+    const { content } = await agentService.callLLM(summaryPrompt);
+    
+    // Log the result
+    logger.info(`Generated conversation summary of ${content.length} characters`);
+    
+    return `CONVERSATION SUMMARY: ${content}`;
   } catch (error) {
     logger.error('Error summarizing conversation:', error);
-    throw new HttpError('Failed to summarize conversation', 500);
+    // Return a basic fallback summary rather than throwing
+    return `This conversation contains ${messages.length} messages between the user and their agent.`;
   }
 }
 

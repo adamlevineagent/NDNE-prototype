@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import IssuesMatrix, { Issue } from '../IssuesMatrix';
 
 import { useDashboard } from '../../context/DashboardContext';
-
 import { useChatContext } from '../../hooks/useChatContext';
 
 interface PositionsMatrixTabProps {
@@ -20,7 +19,7 @@ const PositionsMatrixTab: React.FC<PositionsMatrixTabProps> = ({
   agentColor,
   onChatMaximize
 }) => {
-  const { issues } = useDashboard();
+  const { issues, selectIssue } = useDashboard();
   const { setChatContext } = useChatContext();
 
   // State for filter controls
@@ -50,11 +49,34 @@ const PositionsMatrixTab: React.FC<PositionsMatrixTabProps> = ({
   });
 
   // Handler for "Discuss a New Issue"
+  // Handler for "Discuss a New Issue"
   const handleDiscussNewIssue = () => {
     setChatContext({
-      type: 'new_issue',
-      data: {}
+      type: 'positions',
+      data: {
+        newIssue: true
+      }
     });
+    onChatMaximize();
+  };
+
+  // Handler for discussing any existing issue
+  const handleDiscussIssue = (issueId: string, title: string) => {
+    // Find the issue with the matching ID
+    const issue = issues.find(issue => issue.id === issueId);
+    
+    // Update UI state in dashboard context
+    selectIssue(issueId);
+    
+    // Set the chat context with detailed information
+    setChatContext({
+      type: 'positions',
+      data: {
+        selectedIssue: issue || { id: issueId, title }
+      }
+    });
+    
+    // Maximize the chat panel
     onChatMaximize();
   };
 
@@ -115,13 +137,7 @@ const PositionsMatrixTab: React.FC<PositionsMatrixTabProps> = ({
             selectedIssues={sortedIssues}
             step={7} // Use step 7 for dashboard view
             agentColor={agentColor}
-            onDiscussIssue={(issueId, title) => {
-              setChatContext({
-                type: 'issue_discussion',
-                data: { issueId, title }
-              });
-              onChatMaximize();
-            }}
+            onDiscussIssue={handleDiscussIssue}
           />
         </div>
       )}
@@ -262,17 +278,50 @@ const PositionsMatrixTab: React.FC<PositionsMatrixTabProps> = ({
         }
         
         @media (max-width: 640px) {
-          .matrix-controls {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 1rem;
-          }
-          
-          .control-sort {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-          }
+            .matrix-controls {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            
+            .control-sort {
+                width: 100%;
+                display: flex;
+                justify-content: space-between;
+            }
+            
+            .issue-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .action-button {
+                width: 100%;
+                margin: 0.5rem 0;
+                padding: 1rem;
+            }
+            
+            .tab-header h2 {
+                font-size: 1.25rem;
+            }
+        }
+        
+        /* Tablet responsiveness */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .issues-matrix-wrapper {
+                overflow-x: auto;
+            }
+        }
+        
+        /* Data refresh animation */
+        @keyframes refreshPulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+        
+        .refreshing {
+            animation: refreshPulse 1.5s infinite;
         }
       `}</style>
     </div>

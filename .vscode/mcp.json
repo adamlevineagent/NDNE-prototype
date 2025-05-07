@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "puppeteer": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+    },
+    "basic-memory": {
+      "command": "bash",
+      "args": ["-c", "cd mcp_servers/basic-memory && source venv/bin/activate && python -m src.basic_memory.mcp.main"]
+    }
+  }
+}

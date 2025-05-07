@@ -48,7 +48,15 @@ const DashboardPage: React.FC = () => {
     const [vetoFeedbackMessage, setVetoFeedbackMessage] = useState<{message: string, isError: boolean} | null>(null);
 
     // Dashboard context
-    const { currentTab, setCurrentTab, issues, isLoading, error, refreshData } = useDashboard();
+    const {
+      currentTab,
+      setCurrentTab,
+      issues,
+      isLoading,
+      error,
+      refreshData,
+      currentTabData  // Add the currentTabData
+    } = useDashboard();
 
     // Chat panel state
     const [isChatMinimized, setIsChatMinimized] = useState(true);
@@ -240,28 +248,41 @@ const DashboardPage: React.FC = () => {
     
     // Handle tab switching with context awareness for chat panel
     const handleTabChange = (tab: TabType) => {
-        setCurrentTab(tab);
-        // Update chat context based on active tab
-        switch (tab) {
-            case 'positions':
-                setChatContext({
-                    type: 'positions',
-                    data: { issues }
-                });
-                break;
-            case 'activity':
-                setChatContext({
-                    type: 'activity',
-                    data: { recentActions }
-                });
-                break;
-            case 'proposals':
-                setChatContext({
-                    type: 'proposals',
-                    data: {}
-                });
-                break;
-        }
+      setCurrentTab(tab);
+      
+      // Update chat context based on active tab with more structured data
+      switch (tab) {
+        case 'positions':
+          setChatContext({
+            type: 'positions',
+            data: {
+              issues: currentTabData.positions?.issues || issues,
+              selectedIssue: currentTabData.positions?.selectedIssue
+            }
+          });
+          break;
+        case 'activity':
+          setChatContext({
+            type: 'activity',
+            data: {
+              recentActions: currentTabData.activity?.recentActions || recentActions,
+              selectedAction: currentTabData.activity?.selectedAction
+            }
+          });
+          break;
+        case 'proposals':
+          setChatContext({
+            type: 'proposals',
+            data: {
+              proposals: currentTabData.proposals?.proposals || [],
+              selectedProposal: currentTabData.proposals?.selectedProposal
+            }
+          });
+          break;
+      }
+      
+      // Log for debugging purposes
+      console.log(`[Dashboard] Switched to tab: ${tab}, updated chat context`);
     };
 
     return (
@@ -310,6 +331,7 @@ const DashboardPage: React.FC = () => {
                         isVetoingAction={isVetoingAction}
                         vetoingActionId={vetoingActionId}
                         vetoFeedbackMessage={vetoFeedbackMessage}
+                        onChatMaximize={() => setIsChatMinimized(false)}
                     />
                 )}
                 
@@ -317,6 +339,7 @@ const DashboardPage: React.FC = () => {
                     <ProposalsTab
                         welcomeMessage={welcomeMessage}
                         agentColor={agentData.color}
+                        onChatMaximize={() => setIsChatMinimized(false)}
                     />
                 )}
             </div>
@@ -475,15 +498,43 @@ const DashboardPage: React.FC = () => {
                     
                     .tab-button {
                         padding: 0.75rem 1rem;
+                        font-size: 0.9rem;
                     }
                     
                     .agent-status-panel {
                         flex-direction: column;
                         gap: 0.5rem;
+                        padding: 1rem;
+                    }
+                    
+                    .agent-status-header {
+                        width: 100%;
+                        justify-content: space-between;
+                        margin-bottom: 0.5rem;
+                    }
+                    
+                    .pause-button {
+                        width: 100%;
+                        padding: 0.75rem;
                     }
                     
                     .dashboard-content {
-                        padding-bottom: 120px; /* Increase padding for mobile status panel */
+                        padding-bottom: 140px; /* Increase padding for mobile status panel */
+                    }
+                    
+                    .dashboard-container {
+                        padding: 0.5rem;
+                    }
+                }
+                
+                /* Tablet responsiveness */
+                @media (min-width: 641px) and (max-width: 1024px) {
+                    .dashboard-content {
+                        padding-bottom: 100px;
+                    }
+                    
+                    .agent-status-panel {
+                        padding: 0.75rem 2rem;
                     }
                 }
                 

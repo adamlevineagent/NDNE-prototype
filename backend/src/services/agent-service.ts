@@ -1226,3 +1226,285 @@ function mergeUserKnowledge(
     facts: mergeArrays(existing.facts, newKnowledge.facts)
   };
 }
+
+/**
+ * Process a Sovereign directive to create forum content
+ *
+ * @param agentId The ID of the agent creating the content
+ * @param directive The directive/request from the Sovereign user
+ * @param topicContext Optional additional context about the topic
+ * @returns Structured content suitable for posting to Discourse
+ */
+export async function processForumDirective(
+  agentId: string,
+  directive: string,
+  topicContext?: string
+): Promise<{
+  title?: string;
+  body: string;
+  categoryId?: number;
+}> {
+  try {
+    // Import dynamically to avoid circular dependencies
+    const forumService = await import('./forum-interaction-service');
+    
+    // Generate the forum content using the agent's preferences
+    const forumContent = await forumService.generateDiscoursePostContent(
+      agentId,
+      directive,
+      topicContext
+    );
+    
+    return forumContent;
+  } catch (error: any) {
+    console.error('Error processing forum directive:', error);
+    return {
+      title: directive.length > 50 ? `${directive.substring(0, 47)}...` : directive,
+      body: `I was unable to process this directive due to an error: ${error.message}. Please try again with more specific instructions.`
+    };
+  }
+}
+
+/**
+ * Process Discourse forum content and provide analysis to a Sovereign user
+ *
+ * @param agentId The ID of the agent analyzing the content
+ * @param forumText The raw Markdown text from a Discourse topic/post
+ * @param sourceTopicUrl Optional URL to the original Discourse topic
+ * @returns Analysis of the forum content with relevance to Sov interests and action proposals
+ */
+export async function processForumContent(
+  agentId: string,
+  forumText: string,
+  sourceTopicUrl?: string
+): Promise<string> {
+  try {
+    // Import dynamically to avoid circular dependencies
+    const forumService = await import('./forum-interaction-service');
+    
+    // Process the forum content using the agent's preferences
+    const analysisResult = await forumService.processDiscourseContent(
+      agentId,
+      forumText,
+      sourceTopicUrl
+    );
+    
+    return analysisResult;
+  } catch (error: any) {
+    console.error('Error processing forum content:', error);
+    return `I was unable to process this forum content due to an error: ${error.message}. Please try again with clearer content or formatting.`;
+  }
+}
+
+/**
+ * Direct an agent to post content to Discourse
+ *
+ * @param agentId The ID of the agent to direct
+ * @param directive The directive/request to inform the post content
+ * @param topicContext Optional additional context about the topic
+ * @returns Result of the posting operation
+ */
+export async function directAgentToPostToDiscourse(
+  agentId: string,
+  directive: string,
+  topicContext?: string
+): Promise<{success: boolean, postUrlOrId?: string, error?: string}> {
+  try {
+    // Import dynamically to avoid circular dependencies
+    const forumService = await import('./forum-interaction-service');
+    
+    // Use the forum service to post to Discourse
+    const result = await forumService.postContentToDiscourse(
+      agentId,
+      directive,
+      topicContext
+    );
+    
+    return result;
+  } catch (error: any) {
+    console.error('Error directing agent to post to Discourse:', error);
+    return {
+      success: false,
+      error: `Error directing agent to post to Discourse: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Direct an agent to start monitoring a Discourse topic or category
+ *
+ * @param agentId The ID of the agent to direct
+ * @param topicId Optional topic ID to monitor
+ * @param categoryId Optional category ID to monitor
+ * @returns Result of the monitoring operation
+ */
+export async function directAgentToMonitorDiscourseTopic(
+  agentId: string,
+  topicId?: number,
+  categoryId?: number
+): Promise<{success: boolean, monitoredTopics?: any, error?: string}> {
+  try {
+    // Import dynamically to avoid circular dependencies
+    const forumService = await import('./forum-interaction-service');
+    
+    // Add the topic/category to the agent's monitored list
+    const result = await forumService.addMonitoredDiscourseTopic(
+      agentId,
+      topicId,
+      categoryId
+    );
+    
+    return result;
+  } catch (error: any) {
+    console.error('Error directing agent to monitor Discourse topic:', error);
+    return {
+      success: false,
+      error: `Error directing agent to monitor Discourse topic: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Direct an agent to stop monitoring a Discourse topic or category
+ *
+ * @param agentId The ID of the agent to direct
+ * @param topicId Optional topic ID to stop monitoring
+ * @param categoryId Optional category ID to stop monitoring
+ * @returns Result of the operation
+ */
+export async function directAgentToStopMonitoringDiscourseTopic(
+  agentId: string,
+  topicId?: number,
+  categoryId?: number
+): Promise<{success: boolean, monitoredTopics?: any, error?: string}> {
+  try {
+    // Import dynamically to avoid circular dependencies
+    const forumService = await import('./forum-interaction-service');
+    
+    // Remove the topic/category from the agent's monitored list
+    const result = await forumService.removeMonitoredDiscourseTopic(
+      agentId,
+      topicId,
+      categoryId
+    );
+    
+    return result;
+  } catch (error: any) {
+    console.error('Error directing agent to stop monitoring Discourse topic:', error);
+    return {
+      success: false,
+      error: `Error directing agent to stop monitoring Discourse topic: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Process content from the agent's monitored Discourse topics
+ *
+ * @param agentId The ID of the agent
+ * @returns Result of the processing operation
+ */
+export async function processAgentMonitoredDiscourseContent(
+  agentId: string
+): Promise<{
+  success: boolean,
+  processedTopics?: Array<{
+    topicId?: number,
+    categoryId?: number,
+    contents: Array<{postId: number, username: string, content: string, createdAt: string}>,
+    analysis?: string
+  }>,
+  error?: string
+}> {
+  try {
+    // Import dynamically to avoid circular dependencies
+    const forumService = await import('./forum-interaction-service');
+    
+    // Get the agent's monitored topics
+    const monitoredTopics = await forumService.getMonitoredDiscourseTopics(agentId);
+    
+    if (monitoredTopics.topicIds.length === 0 && monitoredTopics.categoryIds.length === 0) {
+      return {
+        success: true,
+        processedTopics: []
+      };
+    }
+    
+    const processedTopics: Array<{
+      topicId?: number,
+      categoryId?: number,
+      contents: Array<{postId: number, username: string, content: string, createdAt: string}>,
+      analysis?: string
+    }> = [];
+    
+    // Process each monitored topic
+    for (const topicId of monitoredTopics.topicIds) {
+      // Read content from the topic
+      const result = await forumService.readContentFromDiscourse(
+        agentId,
+        undefined,
+        topicId
+      );
+      
+      if (result.success && result.contents && result.contents.length > 0) {
+        // Analyze the content
+        const contentText = result.contents.map(post =>
+          `## Post by ${post.username} (${post.createdAt}):\n${post.content}`
+        ).join('\n\n');
+        
+        const topicUrl = `${process.env.DISCOURSE_URL}/t/${topicId}`;
+        const analysis = await forumService.processDiscourseContent(
+          agentId,
+          contentText,
+          topicUrl
+        );
+        
+        processedTopics.push({
+          topicId,
+          contents: result.contents,
+          analysis
+        });
+      }
+    }
+    
+    // Process each monitored category
+    for (const categoryId of monitoredTopics.categoryIds) {
+      // Read content from the category
+      const result = await forumService.readContentFromDiscourse(
+        agentId,
+        categoryId
+      );
+      
+      if (result.success && result.contents && result.contents.length > 0) {
+        // Analyze the content
+        const contentText = result.contents.map(post =>
+          `## Post by ${post.username} (${post.createdAt}):\n${post.content}`
+        ).join('\n\n');
+        
+        const categoryUrl = `${process.env.DISCOURSE_URL}/c/${categoryId}`;
+        const analysis = await forumService.processDiscourseContent(
+          agentId,
+          contentText,
+          categoryUrl
+        );
+        
+        processedTopics.push({
+          categoryId,
+          contents: result.contents,
+          analysis
+        });
+      }
+    }
+    
+    return {
+      success: true,
+      processedTopics
+    };
+  } catch (error: any) {
+    console.error('Error processing agent monitored Discourse content:', error);
+    return {
+      success: false,
+      error: `Error processing agent monitored Discourse content: ${error.message}`
+    };
+  }
+}

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useDashboard } from '../../context/DashboardContext';
+import { useChatContext } from '../../hooks/useChatContext';
 
 interface RecentAction {
     id: string;
@@ -24,6 +26,7 @@ interface ActivityAuditTabProps {
     isVetoingAction: boolean;
     vetoingActionId: string | null;
     vetoFeedbackMessage: VetoFeedbackMessage | null;
+    onChatMaximize?: () => void; // Add prop to maximize chat when discussing an action
 }
 
 /**
@@ -37,14 +40,23 @@ const ActivityAuditTab: React.FC<ActivityAuditTabProps> = ({
     handleVeto,
     isVetoingAction,
     vetoingActionId,
-    vetoFeedbackMessage
+    vetoFeedbackMessage,
+    onChatMaximize
 }) => {
+    // Get data and actions from context hooks
+    const { selectAction, currentTabData } = useDashboard();
+    const { setChatContext } = useChatContext();
+
+    // Get actions from props or from context if available
+    const actions = currentTabData.activity?.recentActions?.length ?
+                    currentTabData.activity.recentActions : recentActions;
+
     // State for filter controls
     const [filterType, setFilterType] = useState<'all' | 'vote' | 'comment'>('all');
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     
     // Filter actions based on current settings
-    const filteredActions = recentActions.filter(action => {
+    const filteredActions = actions.filter(action => {
         if (filterType === 'all') return true;
         return action.type === filterType;
     });
@@ -158,15 +170,41 @@ const ActivityAuditTab: React.FC<ActivityAuditTabProps> = ({
                                             {action.isOverridden && (
                                                 <span className="badge override-badge">Overridden by You</span>
                                             )}
-                                            {action.canVeto && !action.isOverridden && (
+                                            <div className="activity-action-buttons">
+                                                {action.canVeto && !action.isOverridden && (
+                                                    <button
+                                                        className="veto-button"
+                                                        onClick={() => handleVeto(action.id, action.type)}
+                                                        disabled={isVetoingAction}
+                                                    >
+                                                        {isVetoingAction && vetoingActionId === action.id ? 'Processing...' : 'Veto/Undo'}
+                                                    </button>
+                                                )}
+                                                
                                                 <button
-                                                    className="veto-button"
-                                                    onClick={() => handleVeto(action.id, action.type)}
-                                                    disabled={isVetoingAction}
+                                                    className="discuss-button"
+                                                    style={{ backgroundColor: agentColor }}
+                                                    onClick={() => {
+                                                        // Update UI state in context
+                                                        selectAction(action.id);
+                                                        
+                                                        // Update chat context
+                                                        setChatContext({
+                                                            type: 'activity',
+                                                            data: {
+                                                                selectedAction: action
+                                                            }
+                                                        });
+                                                        
+                                                        // Maximize the chat panel
+                                                        if (onChatMaximize) {
+                                                            onChatMaximize();
+                                                        }
+                                                    }}
                                                 >
-                                                    {isVetoingAction && vetoingActionId === action.id ? 'Processing...' : 'Veto/Undo'}
+                                                    Discuss
                                                 </button>
-                                            )}
+                                            </div>
                                             {vetoFeedbackMessage && vetoingActionId === action.id && (
                                                 <div className={`feedback-message ${vetoFeedbackMessage.isError ? 'error' : 'success'}`}>
                                                     {vetoFeedbackMessage.message}
@@ -295,19 +333,46 @@ const ActivityAuditTab: React.FC<ActivityAuditTabProps> = ({
                     color: #4a5568;
                 }
                 
-                .veto-button {
+                .activity-action-buttons {
+                    display: flex;
+                    gap: 0.75rem;
                     margin-top: 0.75rem;
+                }
+                
+                .veto-button, .discuss-button {
                     padding: 0.4rem 0.75rem;
-                    background-color: #e53e3e;
                     color: white;
                     border: none;
                     border-radius: 4px;
                     font-size: 0.85rem;
                     cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+                
+                .veto-button {
+                    background-color: #e53e3e;
                 }
                 
                 .veto-button:hover {
                     background-color: #c53030;
+                }
+                
+                .discuss-button {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.25rem;
+                    font-weight: 500;
+                }
+                
+                .discuss-button:hover {
+                    opacity: 0.9;
+                    transform: translateY(-1px);
+                }
+                
+                .discuss-button::before {
+                    content: "💬";
+                    font-size: 0.9rem;
                 }
                 
                 .veto-button:disabled {
@@ -402,6 +467,47 @@ const ActivityAuditTab: React.FC<ActivityAuditTabProps> = ({
                     .activity-time {
                         margin-top: 0.25rem;
                     }
+                    
+                    .activity-action-buttons {
+                        flex-direction: column;
+                        width: 100%;
+                        gap: 0.5rem;
+                    }
+                    
+                    .veto-button, .discuss-button {
+                        width: 100%;
+                        justify-content: center;
+                    }
+                    
+                    .date-header {
+                        padding-left: 0.5rem;
+                    }
+                }
+                
+                /* Tablet responsiveness */
+                @media (min-width: 641px) and (max-width: 1024px) {
+                    .activity-list {
+                        padding: 0 0.5rem;
+                    }
+                    
+                    .activity-content {
+                        flex: 1;
+                    }
+                    
+                    .activity-action-buttons {
+                        flex-wrap: wrap;
+                    }
+                }
+                
+                /* Add animation for refreshing content */
+                @keyframes refreshPulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.6; }
+                    100% { opacity: 1; }
+                }
+                
+                .refreshing {
+                    animation: refreshPulse 1.5s infinite;
                 }
             `}</style>
         </div>

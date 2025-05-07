@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useDashboard } from '../../context/DashboardContext';
+import { useChatContext } from '../../hooks/useChatContext';
 
 interface Proposal {
     id: string;
@@ -13,6 +15,7 @@ interface Proposal {
 interface ProposalsTabProps {
     welcomeMessage: string;
     agentColor: string;
+    onChatMaximize?: () => void; // Add prop to maximize chat when discussing a proposal
 }
 
 /**
@@ -21,8 +24,13 @@ interface ProposalsTabProps {
  */
 const ProposalsTab: React.FC<ProposalsTabProps> = ({
     welcomeMessage,
-    agentColor
+    agentColor,
+    onChatMaximize
 }) => {
+    // Get data from context
+    const { currentTabData, selectProposal } = useDashboard();
+    const { setChatContext } = useChatContext();
+
     // State for filter controls
     const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'closed'>('all');
     const [filterType, setFilterType] = useState<'all' | 'negotiated' | 'direct'>('all');
@@ -30,35 +38,8 @@ const ProposalsTab: React.FC<ProposalsTabProps> = ({
     // State for the proposal creation dialog
     const [showNewProposalDialog, setShowNewProposalDialog] = useState(false);
     
-    // Sample proposals data (would come from API)
-    const [proposals, setProposals] = useState<Proposal[]>([
-        {
-            id: 'p1',
-            title: 'Increase Budget for Climate Research',
-            description: 'Proposal to increase the budget allocation for climate change research by 15%.',
-            status: 'open',
-            createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-            closeAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
-            isNegotiated: true
-        },
-        {
-            id: 'p2',
-            title: 'New Community Health Initiative',
-            description: 'Proposal to start a new community health program focusing on preventive care.',
-            status: 'draft',
-            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-            isNegotiated: false
-        },
-        {
-            id: 'p3',
-            title: 'Education Technology Investment',
-            description: 'Proposal to invest in technology upgrades for local schools.',
-            status: 'closed',
-            createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-            closeAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-            isNegotiated: true
-        }
-    ]);
+    // Get proposals from context or use default if not available
+    const proposals = currentTabData.proposals?.proposals || [];
     
     // Filter proposals based on current settings
     const filteredProposals = proposals.filter(proposal => {
@@ -232,6 +213,29 @@ const ProposalsTab: React.FC<ProposalsTabProps> = ({
                                             Edit
                                         </button>
                                     )}
+                                    <button
+                                        className="discuss-button"
+                                        style={{ backgroundColor: agentColor }}
+                                        onClick={() => {
+                                            // Update UI state
+                                            selectProposal(proposal.id);
+                                            
+                                            // Update chat context
+                                            setChatContext({
+                                                type: 'proposals',
+                                                data: {
+                                                    selectedProposal: proposal
+                                                }
+                                            });
+                                            
+                                            // Maximize chat panel if handler provided
+                                            if (onChatMaximize) {
+                                                onChatMaximize();
+                                            }
+                                        }}
+                                    >
+                                        Discuss
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -441,11 +445,12 @@ const ProposalsTab: React.FC<ProposalsTabProps> = ({
                     gap: 0.75rem;
                 }
                 
-                .view-button, .edit-button {
+                .view-button, .edit-button, .discuss-button {
                     padding: 0.4rem 0.75rem;
                     border-radius: 4px;
                     font-size: 0.85rem;
                     cursor: pointer;
+                    transition: all 0.2s ease;
                 }
                 
                 .view-button {
@@ -454,10 +459,38 @@ const ProposalsTab: React.FC<ProposalsTabProps> = ({
                     border: none;
                 }
                 
+                .view-button:hover {
+                    background-color: #cbd5e0;
+                }
+                
                 .edit-button {
                     background-color: #4299e1;
                     color: white;
                     border: none;
+                }
+                
+                .edit-button:hover {
+                    background-color: #3182ce;
+                }
+                
+                .discuss-button {
+                    color: white;
+                    border: none;
+                    font-weight: 500;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.25rem;
+                }
+                
+                .discuss-button:hover {
+                    opacity: 0.9;
+                    transform: translateY(-1px);
+                }
+                
+                .discuss-button::before {
+                    content: "💬";
+                    font-size: 0.9rem;
                 }
                 
                 .empty-state {
@@ -609,6 +642,62 @@ const ProposalsTab: React.FC<ProposalsTabProps> = ({
                     .proposals-list {
                         grid-template-columns: 1fr;
                     }
+                    
+                    .proposal-actions {
+                        flex-wrap: wrap;
+                        gap: 0.5rem;
+                    }
+                    
+                    .proposal-actions button {
+                        flex: 1;
+                        min-width: calc(50% - 0.25rem);
+                        justify-content: center;
+                    }
+                    
+                    .proposal-header {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+                    
+                    .proposal-badges {
+                        margin-top: 0.5rem;
+                    }
+                    
+                    .dialog-content {
+                        width: 95%;
+                    }
+                    
+                    .creation-option {
+                        flex-direction: column;
+                        text-align: center;
+                    }
+                    
+                    .option-icon {
+                        margin-right: 0;
+                        margin-bottom: 0.5rem;
+                    }
+                }
+                
+                /* Tablet responsiveness */
+                @media (min-width: 641px) and (max-width: 1024px) {
+                    .proposals-list {
+                        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                    }
+                    
+                    .proposal-actions {
+                        flex-wrap: wrap;
+                    }
+                }
+                
+                /* Data refresh animation */
+                @keyframes refreshPulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.6; }
+                    100% { opacity: 1; }
+                }
+                
+                .refreshing {
+                    animation: refreshPulse 1.5s infinite;
                 }
             `}</style>
         </div>

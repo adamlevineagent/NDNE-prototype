@@ -42,6 +42,7 @@ model Agent {
   onboardingCompleted Boolean               @default(false)
   lastInteraction     DateTime?
   userKnowledge       Json                  @default("{}")
+  monitoredDiscourseTopics Json             @default("{\"categoryIds\": [], \"topicIds\": []}")
 
   user                User                  @relation(fields: [userId], references: [id])
   votes               Vote[]

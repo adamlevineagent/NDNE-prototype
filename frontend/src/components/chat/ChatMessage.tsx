@@ -1,4 +1,6 @@
 import React from 'react';
+import ForumPostDisplay from '../forum/ForumPostDisplay';
+import ForumAnalysisDisplay from '../forum/ForumAnalysisDisplay';
 import './ChatMessage.css';
 
 export interface ChatMessageProps {
@@ -40,6 +42,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     metadataUserName: message.metadata?.userName
   });
 
+  // Check if this message contains forum content
+  const hasForumPost = message.metadata?.forumPost;
+  const hasForumAnalysis = message.metadata?.forumAnalysis;
+
   return (
     <div className={`chat-message ${isAgent ? 'agent-message' : 'user-message'}`}>
       <div
@@ -47,9 +53,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         style={{
           backgroundColor: isAgent ? `${agentColor}22` : undefined,
           borderLeftColor: isAgent ? agentColor : undefined
-        }}
-        onClick={() => {
-          // Log the applied styles when clicked for debugging
         }}
       >
         <div className="message-header">
@@ -62,9 +65,36 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           </span>
           <span className="message-time">{formattedTime}</span>
         </div>
+        
         <div className="message-text">
           {message.content}
         </div>
+        
+        {/* Render forum post content if available */}
+        {hasForumPost && (
+          <div className="forum-content-wrapper">
+            <ForumPostDisplay
+              title={message.metadata.forumPost.title}
+              body={message.metadata.forumPost.body}
+              category={message.metadata.forumPost.category}
+            />
+          </div>
+        )}
+        
+        {/* Render forum analysis if available */}
+        {hasForumAnalysis && (
+          <div className="forum-content-wrapper">
+            <ForumAnalysisDisplay
+              summary={message.metadata.forumAnalysis.summary}
+              keyTopics={message.metadata.forumAnalysis.keyTopics || []}
+              relevanceScore={message.metadata.forumAnalysis.relevanceScore || 0}
+              alignmentAnalysis={message.metadata.forumAnalysis.alignmentAnalysis || ''}
+              actionItems={message.metadata.forumAnalysis.actionItems || []}
+              sentiment={message.metadata.forumAnalysis.sentiment}
+              recommendedResponse={message.metadata.forumAnalysis.recommendedResponse}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

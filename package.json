@@ -2,7 +2,10 @@
   "name": "ndne",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["frontend", "backend"],
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
     "prepare": "husky install",
     "lint": "eslint . --ext .ts,.tsx",
@@ -15,11 +18,14 @@
     "build": "npm run build --workspaces"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "eslint": "^8.30.0",
-    "prettier": "^2.8.0",
-    "husky": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.46.0",
     "@typescript-eslint/parser": "^5.46.0",
-    "@typescript-eslint/eslint-plugin": "^5.46.0"
+    "eslint": "^8.30.0",
+    "husky": "^8.0.0",
+    "prettier": "^2.8.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.11.0"
   }
 }

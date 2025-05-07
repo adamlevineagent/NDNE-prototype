@@ -4,3 +4,5 @@ dist
 .env
 .env.*
 pnpm-lock.yaml
+mcp_servers/basic-memory/.git/
+mcp_servers/basic-memory/

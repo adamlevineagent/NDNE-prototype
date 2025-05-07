@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ChatInterface from './chat/ChatInterface';
+import { useDashboard } from '../context/DashboardContext';
+import { useChatContext } from '../hooks/useChatContext';
 import './AgentChatPanel.css';
 
 interface AgentChatPanelProps {
@@ -19,6 +21,9 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
   contextualHelp,
   userName
 }) => {
+  // Get context from Dashboard and Chat contexts
+  const { currentTab, currentTabData } = useDashboard();
+  const { chatContext } = useChatContext();
   const [agent, setAgent] = useState<{
     name: string;
     color: string;
@@ -104,9 +109,67 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
     );
   }
 
+  // Function to render a contextual header based on the current tab and selected items
+  const renderContextualHeader = () => {
+    if (!currentTabData) return null;
+    
+    // Different header content based on current tab and selected items
+    switch (currentTab) {
+      case 'positions':
+        if (currentTabData.positions?.selectedIssue) {
+          const issue = currentTabData.positions.selectedIssue;
+          return (
+            <div className="contextual-chat-header">
+              <strong>Discussing Issue:</strong> {issue.title}
+              {issue.stance && <div className="stance-badge">Your stance: {issue.stance}</div>}
+            </div>
+          );
+        }
+        break;
+        
+      case 'activity':
+        if (currentTabData.activity?.selectedAction) {
+          const action = currentTabData.activity.selectedAction;
+          return (
+            <div className="contextual-chat-header">
+              <strong>Discussing Action:</strong> {action.type === 'vote' ? 'Vote' : 'Comment'} on "{action.proposalTitle}"
+              <div className="action-details">{action.actionDetails}</div>
+            </div>
+          );
+        }
+        break;
+        
+      case 'proposals':
+        if (currentTabData.proposals?.selectedProposal) {
+          const proposal = currentTabData.proposals.selectedProposal;
+          return (
+            <div className="contextual-chat-header">
+              <strong>Discussing Proposal:</strong> {proposal.title}
+              <div className="proposal-status">Status: {proposal.status}</div>
+            </div>
+          );
+        }
+        break;
+      
+      default:
+        return null;
+    }
+    
+    // Generic headers if no specific item is selected
+    if (currentTab === 'positions') {
+      return <div className="contextual-chat-header">Discussing your positions on issues</div>;
+    } else if (currentTab === 'activity') {
+      return <div className="contextual-chat-header">Discussing your recent activity</div>;
+    } else if (currentTab === 'proposals') {
+      return <div className="contextual-chat-header">Discussing proposals</div>;
+    }
+    
+    return null;
+  };
+
   return (
     <div className="agent-chat-panel">
-      <div 
+      <div
         className="chat-panel-header"
         style={{ backgroundColor: agent?.color || '#007bff' }}
       >
@@ -118,6 +181,10 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
         </button>
       </div>
       <div className="chat-panel-body">
+        {/* Context-aware header based on selected item */}
+        {renderContextualHeader()}
+        
+        {/* Original contextual help banner */}
         {contextualHelp && (
           <div className="contextual-help-banner" style={{ backgroundColor: agent?.color ? `${agent.color}22` : '#007bff22' }}>
             <p>
@@ -146,7 +213,7 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
 
 export default AgentChatPanel;
 
-// Add CSS for the contextual help banner
+// Add CSS for the contextual help banner and contextual header
 const style = document.createElement('style');
 style.textContent = `
   .contextual-help-banner {
@@ -158,6 +225,39 @@ style.textContent = `
   
   .contextual-help-banner p {
     margin: 0;
+  }
+  
+  .contextual-chat-header {
+    padding: 10px 12px;
+    margin: 0 0 15px 0;
+    border-radius: 6px;
+    background-color: #f8f9fa;
+    border-left: 4px solid #4299E1;
+    font-size: 0.95rem;
+  }
+  
+  .contextual-chat-header strong {
+    display: block;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    color: #4a5568;
+  }
+  
+  .stance-badge {
+    display: inline-block;
+    background-color: #ebf4ff;
+    color: #4299E1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 5px;
+    font-size: 0.8rem;
+  }
+  
+  .action-details, .proposal-status {
+    font-size: 0.85rem;
+    color: #718096;
+    margin-top: 3px;
   }
 `;
 document.head.appendChild(style);

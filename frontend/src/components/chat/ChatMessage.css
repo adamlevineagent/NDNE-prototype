@@ -55,8 +55,35 @@
   word-break: break-word;
 }
 
+/* Styles for forum content */
+.forum-content-wrapper {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #dee2e6;
+  width: 100%;
+}
+
+/* Adjust user messages with forum content */
+.user-message .forum-content-wrapper {
+  background-color: white;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+  color: #212529;
+}
+
+/* Make sure agent messages with forum content are wide enough */
+.agent-message .message-content:has(.forum-content-wrapper) {
+  min-width: 60%;
+}
+
 @media (max-width: 768px) {
   .message-content {
     max-width: 90%;
+  }
+  
+  .agent-message .message-content:has(.forum-content-wrapper) {
+    min-width: 80%;
+    max-width: 95%;
   }
 }

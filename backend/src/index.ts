@@ -13,12 +13,14 @@ import feedbackRouter from './routes/agents/feedbackHandler'; // Import the feed
 import onboardingRouter from './routes/onboarding'; // Import the onboarding router
 import adminRouter from './routes/admin'; // Import the admin router
 import chatRouter from './routes/chat'; // Import the chat router
+import forumRouter from './routes/forum'; // Import the forum router
 import negotiationRouter from './routes/negotiation'; // Import the negotiation router
 import negotiationFeedbackRouter from './routes/feedback'; // Import the negotiation feedback router
 import agentMeRouter from './routes/agents/me'; // Import the agent "me" router
 import agentRouter from './routes/agents/index'; // Import the main agent router
 
 import issuesRouter from './routes/issues';
+import { startForumPollingService, stopForumPollingService } from './services/forum-polling-service'; // Import forum polling service
 
 dotenv.config();
 
@@ -27,6 +29,14 @@ requiredEnv.forEach(key => {
   if (!process.env[key]) {
     logger.error(`Missing env var: ${key}`);
     process.exit(1);
+  }
+});
+
+// Check for optional Discourse API environment variables and log warnings if missing
+const discourseEnv = ['DISCOURSE_URL', 'DISCOURSE_API_KEY', 'DISCOURSE_API_USERNAME'];
+discourseEnv.forEach(key => {
+  if (!process.env[key]) {
+    logger.warn(`Missing Discourse env var: ${key}. Discourse API integration will be limited.`);
   }
 });
 
@@ -56,6 +66,7 @@ app.use('/api/agents', feedbackRouter); // Mount the feedback router
 app.use('/api/onboarding', onboardingRouter); // Mount the onboarding router
 app.use('/api/admin', adminRouter); // Mount the admin router
 app.use('/api/chat', chatRouter); // Mount the chat router
+app.use('/api/forum', forumRouter); // Mount the forum router
 app.use('/api', negotiationRouter); // Mount the negotiation router
 app.use('/api', negotiationFeedbackRouter); // Mount the negotiation feedback router
 app.use('/api/agents', agentMeRouter); // Mount the agent "me" router
@@ -84,6 +95,19 @@ app.use(errorHandler);
 
 app.listen(port, () => {
   logger.info(`NDNE backend listening at http://localhost:${port}`);
+  
+  // Start the forum polling service after server is up
+  if (process.env.DISCOURSE_URL && process.env.DISCOURSE_API_KEY && process.env.DISCOURSE_API_USERNAME) {
+    startForumPollingService()
+      .then(() => {
+        logger.info('Forum polling service started successfully');
+      })
+      .catch(error => {
+        logger.error('Failed to start forum polling service:', error);
+      });
+  } else {
+    logger.warn('Forum polling service not started: Missing Discourse API configuration');
+  }
 });
 
 // Handle unhandled promise rejections
@@ -98,5 +122,36 @@ process.on('uncaughtException', (error) => {
   // Give the logger time to process the error before exiting
   setTimeout(() => {
     process.exit(1);
+  }, 1000);
+});
+
+// Graceful shutdown handling
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  try {
+    await stopForumPollingService();
+    logger.info('Forum polling service stopped successfully');
+  } catch (error) {
+    logger.error('Error stopping forum polling service:', error);
+  }
+  
+  // Give services time to clean up before exiting
+  setTimeout(() => {
+    process.exit(0);
+  }, 1000);
+});
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  try {
+    await stopForumPollingService();
+    logger.info('Forum polling service stopped successfully');
+  } catch (error) {
+    logger.error('Error stopping forum polling service:', error);
+  }
+  
+  // Give services time to clean up before exiting
+  setTimeout(() => {
+    process.exit(0);
   }, 1000);
 });

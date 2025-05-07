@@ -28,7 +28,12 @@ services:
       DB_URL: postgres://user:pass@postgres:5432/ndne
       REDIS_URL: redis://redis:6379
       JWT_SECRET: your_jwt_secret
+      OPENROUTER_API_KEY: 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
       CORS_ORIGINS: http://localhost:5173,http://localhost:5174
+      # Discourse API Settings
+      DISCOURSE_URL: ${DISCOURSE_URL:-http://localhost:3000}
+      DISCOURSE_API_KEY: ${DISCOURSE_API_KEY:-your_discourse_api_key}
+      DISCOURSE_API_USERNAME: ${DISCOURSE_API_USERNAME:-system}
   frontend:
     image: node:18
     working_dir: /app
